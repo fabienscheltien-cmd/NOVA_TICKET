@@ -1,0 +1,36 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: nova
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d nova" --health-interval 5s --health-retries 10
+    env:
+      DATABASE_URL_ADMIN: postgres://postgres:postgres@localhost:5432/nova
+      DATABASE_URL_APP: postgres://nova_app:nova_app_dev@localhost:5432/nova
+      NOVA_APP_PASSWORD: nova_app_dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm --filter @nova/api db:bootstrap
+      - run: pnpm db:migrate
+      - name: Tests d'isolation (niveaux 1 à 3 + contrôle négatif)
+        run: pnpm test
+      - run: pnpm build
