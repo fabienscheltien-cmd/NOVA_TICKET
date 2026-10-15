@@ -1,0 +1,11 @@
+import type { INestApplication } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
+import { PgExceptionFilter } from './http-errors.js';
+
+/** Configuration commune au serveur et aux tests : limites de corps, CSV en texte, filtre d'erreurs. */
+export function configureApp(app: INestApplication): void {
+  const express = app as unknown as NestExpressApplication;
+  express.useBodyParser('json', { limit: '1mb' });
+  express.useBodyParser('text', { type: ['text/csv', 'text/plain'], limit: '5mb' });
+  app.useGlobalFilters(new PgExceptionFilter());
+}

@@ -4,6 +4,7 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type pg from 'pg';
 import { AppModule } from '../src/app.module.js';
+import { configureApp } from '../src/app.setup.js';
 import { MAILER, MemoryMailer } from '../src/auth/mailer.js';
 import { totp } from '../src/auth/totp.js';
 import { ID, TEST_PASSWORD, adminClient, createUser, seed } from './helpers.js';
@@ -36,6 +37,7 @@ describe('authentification — parcours HTTP de bout en bout', () => {
     await seed(admin);
     const mod = await Test.createTestingModule({ imports: [AppModule] }).overrideProvider(MAILER).useValue(mailer).compile();
     app = mod.createNestApplication();
+    configureApp(app);
     await app.listen(0, '127.0.0.1');
     base = (await app.getUrl()).replace('[::1]', '127.0.0.1');
     adminId = await createUser(admin, { email: 'admin.b1@test.invalid', memberships: [[ID.B1, 'admin_org']] });
