@@ -4,7 +4,12 @@ import type pg from 'pg';
 import { adminClient, appPool, checkCatalog, DATA_TABLES, ID, seed, tenantDb } from './helpers.js';
 
 const SECURITY_DEFINER_ALLOWLIST = [
-  'app.assert_ticket_manager', 'app.create_fil', 'app.revoke_ticket_share', 'app.share_ticket',
+  'app.assert_role_for_org', 'app.assert_ticket_manager', 'app.auth_get_user', 'app.auth_lookup',
+  'app.auth_register_failure', 'app.auth_register_success', 'app.create_fil', 'app.invitation_accept_existing',
+  'app.invitation_accept_new', 'app.mfa_begin', 'app.mfa_confirm', 'app.mfa_use_backup', 'app.org_deactivate',
+  'app.resolve_membership', 'app.revoke_ticket_share', 'app.session_create', 'app.session_revoke',
+  'app.session_revoke_user', 'app.session_rotate', 'app.share_ticket', 'app.trg_appartenance_role',
+  'app.user_deactivate', 'app.workspaces_of',
 ];
 
 describe('niveau 1 — catalogue', () => {

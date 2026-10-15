@@ -1,5 +1,33 @@
 import pg from 'pg';
+import { loadAuthConfig } from '../src/auth/config.js';
+import { hashPassword } from '../src/auth/crypto.js';
+import { encryptSecret } from '../src/auth/crypto.js';
 import { TenantDb } from '../src/db/tenant-db.js';
+
+// SECRETS DE TEST FACTICES : jamais utilisés hors tests.
+process.env.JWT_SECRET ??= 'test-only-jwt-secret-0123456789abcdef0123456789';
+process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32, 7).toString('base64');
+process.env.DATABASE_URL_APP ??= 'postgres://nova_app:nova_app_dev@localhost:5432/nova';
+export const authConfig = () => loadAuthConfig();
+
+export const TEST_PASSWORD = 'correct horse battery staple';
+
+/** Crée un utilisateur avec identifiants (connexion administrateur). MFA optionnelle avec secret connu. */
+export async function createUser(
+  admin: pg.Client,
+  input: { email: string; memberships: Array<[orgId: string, role: string]>; mfaSecret?: string; id?: string },
+): Promise<string> {
+  const u = await admin.query<{ id: string }>(
+    'INSERT INTO utilisateur (id, email, nom) VALUES (COALESCE($1, gen_random_uuid()), $2, $2) RETURNING id', [input.id ?? null, input.email]);
+  const id = u.rows[0]!.id;
+  await admin.query(
+    'INSERT INTO credential (utilisateur_id, password_hash, mfa_secret_enc, mfa_enabled) VALUES ($1, $2, $3, $4)',
+    [id, await hashPassword(TEST_PASSWORD), input.mfaSecret ? encryptSecret(input.mfaSecret, authConfig().encKey) : null, Boolean(input.mfaSecret)]);
+  for (const [org, role] of input.memberships) {
+    await admin.query('INSERT INTO appartenance (utilisateur_id, org_id, role) VALUES ($1, $2, $3)', [id, org, role]);
+  }
+  return id;
+}
 
 export const ADMIN_URL = process.env.DATABASE_URL_ADMIN ?? 'postgres://postgres:postgres@localhost:5432/nova';
 export const APP_URL = process.env.DATABASE_URL_APP ?? 'postgres://nova_app:nova_app_dev@localhost:5432/nova';
@@ -22,13 +50,16 @@ export const adminClient = async () => {
 export const appPool = () => new pg.Pool({ connectionString: APP_URL, max: 1 });
 export const tenantDb = (pool: pg.Pool) => new TenantDb(pool);
 
+// Tables lisibles par nova_app : sans espace de travail, elles doivent toutes renvoyer 0 ligne.
 export const DATA_TABLES = [
-  'message', 'fil_participant', 'fil', 'acces_objet', 'ticket', 'site', 'appartenance', 'utilisateur', 'organisation',
+  'message', 'fil_participant', 'fil', 'acces_objet', 'ticket', 'site', 'appartenance', 'utilisateur', 'organisation', 'invitation',
 ] as const;
+// Tables d'authentification : aucun droit pour nova_app.
+export const AUTH_TABLES = ['credential', 'code_secours', 'session_refresh'] as const;
 
 /** Vide et reconstruit le jeu de données de test (connexion administrateur, hors RLS). */
 export async function seed(admin: pg.Client): Promise<void> {
-  await admin.query(`TRUNCATE ${DATA_TABLES.join(', ')} CASCADE`);
+  await admin.query(`TRUNCATE ${[...DATA_TABLES, ...AUTH_TABLES].join(', ')} CASCADE`);
   const orgs: Array<[string, string, string]> = [
     [ID.B1, 'bailleur', 'Bailleur 1'], [ID.B2, 'bailleur', 'Bailleur 2'],
     [ID.PM1, 'property_manager', 'PM 1 (mandats B1 et B2)'], [ID.PM2, 'property_manager', 'PM 2'],
