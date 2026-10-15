@@ -1,6 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import pg from 'pg';
+import { createOrgWithAdminInvitation } from './create-org.js';
 
 const MIGRATIONS_DIR = path.resolve(import.meta.dirname, '../../../../db/migrations');
 
@@ -71,8 +72,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     } else if (command === 'migrate') {
       const applied = await migrate(client);
       console.log(applied.length ? `appliquées : ${applied.join(', ')}` : 'rien à appliquer');
+    } else if (command === 'create-org') {
+      const [type, nom, adminEmail] = process.argv.slice(3);
+      if (!type || !nom || !adminEmail || !['bailleur', 'property_manager', 'prestataire'].includes(type)) {
+        throw new Error('usage : cli.ts create-org <bailleur|property_manager|prestataire> <nom> <email-admin>');
+      }
+      const r = await createOrgWithAdminInvitation(client, { type: type as 'bailleur', nom, adminEmail });
+      console.log(`organisation ${r.orgId} créée ; jeton d'invitation (affiché une seule fois) : ${r.token}`);
     } else {
-      throw new Error('usage : cli.ts bootstrap | migrate');
+      throw new Error('usage : cli.ts bootstrap | migrate | create-org');
     }
   } finally {
     await client.end();
