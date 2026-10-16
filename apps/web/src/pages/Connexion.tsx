@@ -2,6 +2,7 @@ import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'rea
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { type AuthClient, ErreurAuth, type Espace } from '../auth';
 import { useApp } from '../context';
+import logoNova from '../assets/logo-nova-serenity.svg';
 import { Field, Loading } from '../ui';
 
 const TYPES_ORG: Record<string, string> = { bailleur: 'Bailleur', property_manager: 'Property manager', prestataire: 'Prestataire', editeur: 'Éditeur' };
@@ -13,10 +14,16 @@ const message = (e: unknown) => (e instanceof ErreurAuth ? e.message : 'Une erre
 
 function Carte({ titre, children }: { titre: string; children: ReactNode }) {
   return (
-    <main className="gate" id="contenu">
-      <h1>{titre}</h1>
-      {children}
-    </main>
+    <div className="gate-page">
+      <main className="gate" id="contenu">
+        <img className="gate-logo" src={logoNova} alt="NOVA Serenity" />
+        <p className="gate-sous">Ticket · Console de facility management</p>
+        <div className="gate-carte">
+          <h1>{titre}</h1>
+          {children}
+        </div>
+      </main>
+    </div>
   );
 }
 
