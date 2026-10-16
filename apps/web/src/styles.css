@@ -129,7 +129,14 @@ legend { font-weight: 700; padding: 0 .35rem; }
 .candidats .infos { display: flex; gap: .35rem; flex-wrap: wrap; justify-content: flex-end; }
 .historique { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .6rem; }
 .historique li { padding-left: .75rem; border-left: 3px solid var(--border); }
-.gate { max-width: 32rem; margin: 4rem auto; padding: 0 1rem; }
+.gate-page { min-height: 100vh; background: var(--bg) url("./assets/visage.png") no-repeat right 4vw bottom / auto min(85vh, 40rem); }
+.gate-page::before { content: ""; position: fixed; inset: 0; background: var(--bg); opacity: .8; pointer-events: none; z-index: 0; }
+.gate-page > .gate { position: relative; z-index: 1; }
+.gate { max-width: 28rem; margin: 0 auto; padding: 3rem 1rem 2rem; }
+.gate-logo { display: block; width: 11rem; max-width: 70%; height: auto; margin: 0 auto .5rem; }
+.gate-sous { text-align: center; color: var(--muted); margin: 0 0 1.5rem; }
+.gate-carte { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.5rem; }
+@media (prefers-color-scheme: dark) { .gate-logo { filter: brightness(1.7); } .gate-page::before { opacity: .88; } }
 .gate form { display: grid; gap: .75rem; margin-block: 1rem; }
 .espaces { list-style: none; padding: 0; display: grid; gap: .5rem; }
 .espaces .btn { width: 100%; text-align: left; display: flex; flex-direction: column; align-items: flex-start; }
