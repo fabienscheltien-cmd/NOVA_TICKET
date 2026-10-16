@@ -49,7 +49,7 @@ export class OrgGuard implements CanActivate {
     const m = await this.auth.resolveMembership(claims.sub, claims.org);
     if (!m) throw forbidden('not_a_member');
     const permission = this.reflector.get<string | undefined>(PERMISSION_KEY, ctx.getHandler());
-    if (permission && grantFor(m.role, permission) === null) throw forbidden('missing_permission');
+    if (permission && grantFor(m.role, permission, m.org_type) === null) throw forbidden('missing_permission');
     req.userId = claims.sub;
     req.tenant = { userId: claims.sub, orgId: claims.org, role: m.role };
     return true;

@@ -14,7 +14,7 @@ import { signToken, verifyToken } from './tokens.js';
 export interface TokenPair { access_token: string; refresh_token: string; expires_in: number }
 export type LoginResult = ({ status: 'ok' } & TokenPair) | { status: 'mfa_required'; mfa_token: string };
 export interface Workspace { org_id: string; nom: string; type: string; role: string; mfa_obligatoire: boolean }
-export interface Membership { role: string; mfa_obligatoire: boolean }
+export interface Membership { role: string; mfa_obligatoire: boolean; org_type: string }
 
 const normEmail = (e: string) => e.trim().toLowerCase();
 
@@ -190,6 +190,54 @@ export class AuthService {
       if ((err as { code?: string }).code === '42501') throw new AuthError('invalid_invitation', 400, 'Invitation invalide, expirée ou destinée à une autre adresse');
       throw err;
     }
+  }
+
+  /**
+   * Invite un prestataire depuis une fiche d'annuaire du client courant. Le prestataire crée son compte
+   * (organisation de type prestataire) en acceptant ; le rattachement n'est posé qu'à ce moment.
+   */
+  async inviterPrestataire(ctx: TenantContext, annuaireId: string, rawEmail: string): Promise<{ expires_at: Date }> {
+    const email = normEmail(rawEmail);
+    const token = randomToken();
+    const expiresAt = new Date(Date.now() + this.cfg.invitationTtlSec * 1000);
+    const { client, prestataire } = await this.db.withTenant(ctx, async (c) => {
+      await c.query('SELECT app.inviter_prestataire($1, $2, $3, $4)', [annuaireId, email, sha256Hex(token), expiresAt]);
+      const cl = (await c.query<{ nom: string }>('SELECT nom FROM organisation WHERE id = $1', [ctx.orgId])).rows[0]!;
+      const p = (await c.query<{ nom: string }>('SELECT nom FROM prestataire_annuaire WHERE id = $1', [annuaireId])).rows[0]!;
+      return { client: cl.nom, prestataire: p.nom };
+    }).catch((err) => {
+      const code = (err as { code?: string }).code;
+      if (code === 'P0002') throw new AuthError('not_found', 404, 'Prestataire introuvable');
+      if (code === '23505') throw new AuthError('deja_rattache', 409, 'Ce prestataire a déjà un compte rattaché');
+      if (code === '42501') throw new AuthError('forbidden', 403, 'Invitation réservée à un property manager');
+      throw err;
+    });
+    await this.mailer.sendInvitation({
+      to: email, organisation: prestataire, role: 'admin_org', expiresAt, invitePar: client,
+      link: `${this.cfg.appBaseUrl}/invitations/${token}`,
+    });
+    return { expires_at: expiresAt };
+  }
+
+  // --- Vision de l'administrateur sur son organisation -------------------------------------------
+  listMembers(ctx: TenantContext) {
+    return this.db.withTenant(ctx, async (c) =>
+      (await c.query('SELECT * FROM app.org_membres() ORDER BY actif DESC, email')).rows);
+  }
+
+  listInvitations(ctx: TenantContext) {
+    return this.db.withTenant(ctx, async (c) =>
+      (await c.query(
+        `SELECT id, email, role, expires_at, created_at,
+                CASE WHEN accepted_at IS NOT NULL THEN 'acceptee' WHEN revoked_at IS NOT NULL THEN 'revoquee'
+                     WHEN expires_at <= now() THEN 'expiree' ELSE 'en_attente' END AS statut
+           FROM invitation ORDER BY created_at DESC`)).rows);
+  }
+
+  async revokeInvitation(ctx: TenantContext, id: string): Promise<void> {
+    const r = await this.db.withTenant(ctx, (c) => c.query(
+      'UPDATE invitation SET revoked_at = now() WHERE id = $1 AND accepted_at IS NULL AND revoked_at IS NULL RETURNING id', [id]));
+    if (!r.rows[0]) throw new AuthError('not_found', 404, 'Invitation introuvable ou déjà traitée');
   }
 
   // --- Membres --------------------------------------------------------------------------------

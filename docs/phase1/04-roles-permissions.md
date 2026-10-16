@@ -46,11 +46,18 @@ Légende : ✔ accordé · ◐ conditionné · — non
 | `contrat.read` | ✔ | ✔ | — | — | ✔ | — | — | — |
 | `contrat.write` / `sla.configure` | ✔ | ✔ | — | — | — | — | — | — |
 | `user.invite` / `manage` | ✔ | — | — | — | — | — | — | — |
+| `annuaire.read` (annuaire des prestataires, familles) | ✔ | ✔ | ✔ | ✔ | ✔ | — | — | — |
 | `config.manage` (catégories, statuts, règles) | ✔ | ✔ | — | — | — | — | — | — |
 | `report.read` | ✔ | ✔ | ◐ | ✔ | ✔ | — | — | — |
 | `export.run` | ✔ | ✔ | — | — | ✔ | — | — | — |
 | `audit.read` | ✔ | — | — | — | — | — | — | ◐ |
 | `support.access` (via `support_grant`) | — | — | — | — | — | — | — | ◐ |
+
+## Bailleur : vision seule (D37)
+Dans une organisation de type bailleur, toutes les permissions d'écriture du dispatch (`ticket.create|qualify|assign|transition|close|merge_link|comment_*|satisfaction_record`, `ot.*`, `config.manage`) sont refusées, quel que soit le rôle. Le bailleur lit ses tickets et ses sites ; le PM qu'il mandate agit.
+
+## Compte de l'administrateur (D39, à confirmer)
+`admin_org` voit tout son compte : membres, invitations, plus les droits métier de son organisation. `GET /organisation/membres` et `/organisation/invitations` ne renvoient jamais une autre organisation (test d'isolation `comptes-http`).
 
 ## Règles ABAC (contrôles non exprimables en rôle seul)
 1. Affectation d'un ticket à un prestataire : refusée sans **contrat actif** couvrant site + lot technique, ou avec **document de conformité expiré** (assurance, habilitation).

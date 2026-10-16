@@ -90,6 +90,21 @@ export class InvitationsController {
     return this.auth.acceptInvitationNew(token, parse(z.object({ password, nom: z.string().min(1).max(200) }), body), ua);
   }
 
+  /** L'administrateur voit tout son compte : membres, invitations (en attente, acceptées, expirées). */
+  @Get('organisation/membres')
+  @UseGuards(OrgGuard) @RequirePermission('user.manage')
+  async members(@Req() req: AuthedRequest) { return { membres: await this.auth.listMembers(req.tenant!) }; }
+
+  @Get('organisation/invitations')
+  @UseGuards(OrgGuard) @RequirePermission('user.manage')
+  async invitations(@Req() req: AuthedRequest) { return { invitations: await this.auth.listInvitations(req.tenant!) }; }
+
+  @Post('invitations/:id/revoke') @HttpCode(204)
+  @UseGuards(OrgGuard) @RequirePermission('user.invite')
+  async revoke(@Req() req: AuthedRequest, @Param('id') id: string) {
+    await this.auth.revokeInvitation(req.tenant!, parse(uuid, id));
+  }
+
   @Post('organisations/:orgId/members/:userId/deactivate') @HttpCode(204)
   @UseGuards(OrgGuard) @RequirePermission('user.manage')
   async deactivate(@Req() req: AuthedRequest, @Param('orgId') orgId: string, @Param('userId') userId: string) {

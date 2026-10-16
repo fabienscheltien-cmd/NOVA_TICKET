@@ -16,6 +16,15 @@ pnpm --filter @nova/api exec tsx src/db/cli.ts create-org bailleur "Nom du baill
 Le jeton d'invitation s'affiche une seule fois (seule son empreinte est stockée). Il s'utilise via `POST /invitations/{jeton}/accept`.
 Désactivations d'administration (réservées à la plateforme, sans droit pour l'API) : `SELECT app.user_deactivate('<uuid>')`, `SELECT app.org_deactivate('<uuid>')`.
 
+## Console d'administration (web)
+```bash
+pnpm web                       # http://127.0.0.1:5173, données de démonstration (défaut)
+VITE_DATA_SOURCE=api VITE_API_URL=http://localhost:3000 pnpm web   # contre l'API réelle
+```
+En mode API, la console demande le jeton d'accès de l'espace de travail (`POST /auth/login`, puis `POST /me/workspace/switch`) et le conserve dans le navigateur. Voir [annuaire et affectation](../phase2/annuaire-et-affectation.md).
+
+Tests : `pnpm test` exécute le paquet partagé (règle d'éligibilité, démonstration), la console (composants, accessibilité) et l'API (base PostgreSQL réelle, variables d'environnement ci-dessus).
+
 ## Patrimoine : import CSV, QR, mandats
 - Import : `POST /imports/{sites|locaux|occupations}` avec `Content-Type: text/csv`, `?dry_run=true` pour valider sans écrire, `?owner_org_id=` pour qu'un property manager importe pour un bailleur (mandat requis). Séparateur `;` ou `,` détecté d'après l'en-tête, virgule décimale acceptée. Maximum 5 000 lignes. Tout ou rien : en cas d'erreur, rien n'est écrit et le rapport liste chaque ligne en défaut.
 - Colonnes `sites` : `reference, nom, adresse, code_postal, ville, pays, latitude, longitude, surface_m2, usage, portefeuille`.
