@@ -60,6 +60,22 @@ describe('minutes ouvrées', () => {
   });
 });
 
+describe('exactitude à la seconde (régression : dérive selon l\'heure de départ)', () => {
+  it('un départ qui n\'est pas sur une minute pleine, en fin de journée, donne une échéance exacte', () => {
+    for (const depart of ['2026-10-16T17:05', '2026-10-16T23:59', '2026-10-16T00:00', '2026-10-16T12:30']) {
+      const d = new Date(paris(depart).getTime() + 41_333); // + 41 s 333 ms : jamais sur une minute pleine
+      const e = echeanceOuvree(d, 480, CALENDRIER_24_7);
+      assert.equal(e.getTime() - d.getTime(), 480 * 60_000, `départ ${depart} : 480 min ouvrées 24/7 = 480 min réelles, à la milliseconde`);
+    }
+  });
+  it('même exactitude sur un calendrier de bureau (durée traversant plusieurs jours)', () => {
+    const d = new Date(paris('2026-10-15T09:00').getTime() + 41_333);
+    const e = echeanceOuvree(d, 960, BUREAU);
+    assert.equal(minutesOuvreesEntre(d, e, BUREAU), 960);
+    assert.equal(e.getTime() % 60_000, d.getTime() % 60_000, 'les secondes du départ se retrouvent dans l\'échéance');
+  });
+});
+
 describe('pause et reprise (critère 2)', () => {
   const depart = paris('2026-10-15T09:00');
   const sans = echeanceOuvree(depart, 360, BUREAU);
