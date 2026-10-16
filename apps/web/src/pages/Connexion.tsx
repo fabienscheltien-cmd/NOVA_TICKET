@@ -294,3 +294,35 @@ export function InvitationPage() {
     </Carte>
   );
 }
+
+/**
+ * Connexion de DÉMONSTRATION : accepte n'importe quel e-mail et mot de passe (même vides). Le mode démonstration n'a ni API ni
+ * donnée réelle, donc rien n'est protégé ni exposé. Le nom affiché est tiré de l'adresse saisie.
+ */
+export const DEMO_SESSION_KEY = 'nova.demo.session';
+export function nomDemo(email: string): string {
+  const local = email.trim().split('@')[0]?.trim() ?? '';
+  return local ? `${local} (démo)` : 'Administrateur (démo)';
+}
+
+export function ConnexionDemoPage({ onConnecte }: { onConnecte: (nom: string) => void }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  return (
+    <Carte titre="Connexion à NOVA">
+      <p className="alert warn" role="note">
+        <strong>Mode démonstration.</strong> N'importe quel e-mail et mot de passe sont acceptés ; vous entrez comme administrateur
+        sur des données fictives, non enregistrées.
+      </p>
+      <form onSubmit={(e: FormEvent) => { e.preventDefault(); onConnecte(nomDemo(email)); }} noValidate>
+        <Field label="Adresse e-mail">
+          {(p) => <input {...p} type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" autoFocus />}
+        </Field>
+        <Field label="Mot de passe">
+          {(p) => <input {...p} type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />}
+        </Field>
+        <button type="submit" className="btn btn-primary">Se connecter</button>
+      </form>
+    </Carte>
+  );
+}

@@ -1,7 +1,10 @@
 import { creerSource } from '../src/config';
 
 describe('source de données', () => {
-  it('démonstration par défaut', () => {
+  it('démonstration par défaut, avec la connexion permissive ; jamais en mode API', () => {
+    expect(creerSource({}).demoLogin).toBe(true);
+    expect(creerSource({ VITE_DATA_SOURCE: 'api', VITE_API_URL: 'http://api.test' }).demoLogin).toBeUndefined();
+    expect(creerSource({ VITE_DATA_SOURCE: 'api' }).auth).toBeDefined();
     expect(creerSource({}).mode).toBe('demo');
     expect(creerSource({ VITE_DATA_SOURCE: 'demo' }).repo.mode).toBe('demo');
   });
