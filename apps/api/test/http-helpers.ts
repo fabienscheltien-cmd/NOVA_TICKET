@@ -18,7 +18,9 @@ export interface TestApp {
   close(): Promise<void>;
 }
 
-export async function startTestApp(): Promise<TestApp> {
+/** Limite de débit relevée par défaut : les suites se connectent beaucoup depuis 127.0.0.1. */
+export async function startTestApp(opts: { rateLimitAuthPerMin?: number } = {}): Promise<TestApp> {
+  process.env.RATE_LIMIT_AUTH_PER_MIN = String(opts.rateLimitAuthPerMin ?? 1000);
   const mailer = new MemoryMailer();
   const mod = await Test.createTestingModule({ imports: [AppModule] }).overrideProvider(MAILER).useValue(mailer).compile();
   const app = mod.createNestApplication();

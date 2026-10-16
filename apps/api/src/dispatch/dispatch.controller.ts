@@ -1,10 +1,11 @@
-import { Body, Controller, Get, HttpCode, Inject, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Inject, Param, Patch, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
 import { statutPrestataireSchema } from '@nova/shared';
 import { AuthService } from '../auth/auth.service.js';
 import { AuthError } from '../auth/errors.js';
 import { type AuthedRequest, OrgGuard, RequirePermission } from '../auth/guards.js';
 import { pageSchema } from '../patrimoine/schemas.js';
+import { ContratsService } from './contrats.service.js';
 import { DispatchService } from './dispatch.service.js';
 
 function parse<Sc extends z.ZodTypeAny>(schema: Sc, input: unknown): z.infer<Sc> {
@@ -70,4 +71,35 @@ export class DispatchController {
   ticket(@Req() r: AuthedRequest, @Param('id') id: string) { return this.d.getTicket(r.tenant!, idParam(id)); }
   @Post('tickets/:id/affectation') @HttpCode(200) @RequirePermission('ticket.assign')
   affecter(@Req() r: AuthedRequest, @Param('id') id: string, @Body() b: unknown) { return this.d.affecter(r.tenant!, idParam(id), b); }
+}
+
+/** Calendriers ouvrés, contrats de service, règles SLA et paramètres de dispatch. */
+@Controller()
+@UseGuards(OrgGuard)
+export class ContratsController {
+  constructor(@Inject(ContratsService) private readonly c: ContratsService) {}
+
+  @Get('calendriers') @RequirePermission('contrat.read')
+  async calendriers(@Req() r: AuthedRequest) { return { items: await this.c.listCalendriers(r.tenant!) }; }
+  @Post('calendriers') @HttpCode(201) @RequirePermission('sla.configure')
+  creerCalendrier(@Req() r: AuthedRequest, @Body() b: unknown) { return this.c.createCalendrier(r.tenant!, b); }
+  @Put('calendriers/:id') @RequirePermission('sla.configure')
+  majCalendrier(@Req() r: AuthedRequest, @Param('id') id: string, @Body() b: unknown) { return this.c.updateCalendrier(r.tenant!, idParam(id), b); }
+
+  @Get('contrats') @RequirePermission('contrat.read')
+  async contrats(@Req() r: AuthedRequest, @Query() q: unknown) {
+    const f = parse(pageSchema.extend({ annuaire_id: uuid.optional(), statut: z.enum(['actif', 'suspendu']).optional() }), q);
+    return { items: await this.c.listContrats(r.tenant!, f, f) };
+  }
+  @Get('contrats/:id') @RequirePermission('contrat.read')
+  contrat(@Req() r: AuthedRequest, @Param('id') id: string) { return this.c.getContrat(r.tenant!, idParam(id)); }
+  @Post('contrats') @HttpCode(201) @RequirePermission('sla.configure')
+  creerContrat(@Req() r: AuthedRequest, @Body() b: unknown) { return this.c.createContrat(r.tenant!, b); }
+  @Patch('contrats/:id') @RequirePermission('sla.configure')
+  majContrat(@Req() r: AuthedRequest, @Param('id') id: string, @Body() b: unknown) { return this.c.updateContrat(r.tenant!, idParam(id), b); }
+
+  @Get('parametres') @RequirePermission('contrat.read')
+  parametres(@Req() r: AuthedRequest) { return this.c.getParametres(r.tenant!); }
+  @Put('parametres') @RequirePermission('sla.configure')
+  majParametres(@Req() r: AuthedRequest, @Body() b: unknown) { return this.c.setParametres(r.tenant!, b); }
 }

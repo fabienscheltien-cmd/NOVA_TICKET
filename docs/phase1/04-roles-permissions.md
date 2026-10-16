@@ -44,7 +44,7 @@ Légende : ✔ accordé · ◐ conditionné · — non
 | `patrimoine.write` / `import` | ✔ | ✔ | — | ◐ | — | — | — | — |
 | `actif.write` | ✔ | ✔ | — | ◐ | — | — | — | — |
 | `contrat.read` | ✔ | ✔ | — | — | ✔ | — | — | — |
-| `contrat.write` / `sla.configure` | ✔ | ✔ | — | — | — | — | — | — |
+| `contrat.write` (mandats du bailleur) · `sla.configure` (contrats, calendriers, règles) | ✔ | ✔ | — | — | — | — | — | — |
 | `user.invite` / `manage` | ✔ | — | — | — | — | — | — | — |
 | `annuaire.read` (annuaire des prestataires, familles) | ✔ | ✔ | ✔ | ✔ | ✔ | — | — | — |
 | `config.manage` (catégories, statuts, règles) | ✔ | ✔ | — | — | — | — | — | — |

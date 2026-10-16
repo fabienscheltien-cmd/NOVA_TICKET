@@ -1,0 +1,49 @@
+# Production sur une instance OVH (Docker). NON VÉRIFIÉ de bout en bout : voir docs/ops/deploiement.md.
+# Utilisation : cp deploy/env.prod.example deploy/.env.prod (hors dépôt, droits 600), puis
+#   docker compose --env-file deploy/.env.prod -f deploy/docker-compose.prod.yml up -d
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      CONSOLE_HOST: ${CONSOLE_HOST}
+      API_HOST: ${API_HOST}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on: [api, web]
+
+  api:
+    image: ${API_IMAGE}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DATABASE_URL_APP: ${DATABASE_URL_APP}
+      JWT_SECRET: ${JWT_SECRET}
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY}
+      APP_BASE_URL: https://${CONSOLE_HOST}
+      CORS_ORIGINS: https://${CONSOLE_HOST}
+      TRUST_PROXY: "1"
+      RATE_LIMIT_AUTH_PER_MIN: ${RATE_LIMIT_AUTH_PER_MIN:-20}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      retries: 5
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+  web:
+    image: ${WEB_IMAGE}
+    restart: unless-stopped
+    environment:
+      API_ORIGIN: https://${API_HOST}
+    read_only: true
+    tmpfs: ["/tmp", "/var/cache/nginx"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+volumes:
+  caddy_data:

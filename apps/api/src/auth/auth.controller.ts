@@ -4,6 +4,7 @@ import { AuthService } from './auth.service.js';
 import { AuthError, forbidden } from './errors.js';
 import { type AuthedRequest, OrgGuard, RequirePermission, UserGuard } from './guards.js';
 import { MIN_PASSWORD_LENGTH } from './crypto.js';
+import { RateLimit, RateLimitGuard } from './rate-limit.js';
 
 function parse<S extends z.ZodTypeAny>(schema: S, body: unknown): z.infer<S> {
   const r = schema.safeParse(body);
@@ -16,25 +17,39 @@ const email = z.string().email().max(254);
 const password = z.string().min(MIN_PASSWORD_LENGTH).max(256);
 
 @Controller('auth')
+@UseGuards(RateLimitGuard)
 export class AuthController {
   constructor(@Inject(AuthService) private readonly auth: AuthService) {}
 
-  @Post('login') @HttpCode(200)
+  @Post('login') @HttpCode(200) @RateLimit('login')
   login(@Body() body: unknown, @Headers('user-agent') ua?: string) {
     const b = parse(z.object({ email, password: z.string().min(1).max(256) }), body);
     return this.auth.login(b.email, b.password, ua);
   }
 
-  @Post('mfa/verify') @HttpCode(200)
+  @Post('mfa/verify') @HttpCode(200) @RateLimit('mfa')
   mfaVerify(@Body() body: unknown, @Headers('user-agent') ua?: string) {
     const b = parse(z.object({ mfa_token: z.string().min(1), code: z.string().min(6).max(16) }), body);
     return this.auth.verifyMfa(b.mfa_token, b.code, ua);
   }
 
-  @Post('refresh') @HttpCode(200)
+  @Post('refresh') @HttpCode(200) @RateLimit('refresh', 120)
   refresh(@Body() body: unknown, @Headers('user-agent') ua?: string) {
     const b = parse(z.object({ refresh_token: z.string().min(1), org_id: uuid.optional() }), body);
     return this.auth.refresh(b.refresh_token, ua, b.org_id);
+  }
+
+  /** Réponse 202 identique que l'adresse existe ou non. */
+  @Post('password/forgot') @HttpCode(202) @RateLimit('forgot')
+  async forgot(@Body() body: unknown) {
+    await this.auth.requestPasswordReset(parse(z.object({ email }), body).email);
+    return { message: 'Si cette adresse correspond à un compte, un e-mail de réinitialisation vient d\'être envoyé.' };
+  }
+
+  @Post('password/reset') @HttpCode(204) @RateLimit('reset')
+  async reset(@Body() body: unknown) {
+    const b = parse(z.object({ token: z.string().min(10).max(200), password }), body);
+    await this.auth.resetPassword(b.token, b.password);
   }
 
   @Post('logout') @HttpCode(204)
@@ -85,7 +100,7 @@ export class InvitationsController {
   }
 
   /** Public : crée le compte à partir d'une invitation (nouvel utilisateur). */
-  @Post('invitations/:token/accept') @HttpCode(200)
+  @Post('invitations/:token/accept') @HttpCode(200) @UseGuards(RateLimitGuard) @RateLimit('invitation')
   accept(@Param('token') token: string, @Body() body: unknown, @Headers('user-agent') ua?: string) {
     return this.auth.acceptInvitationNew(token, parse(z.object({ password, nom: z.string().min(1).max(200) }), body), ua);
   }

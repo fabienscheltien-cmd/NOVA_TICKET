@@ -130,9 +130,19 @@ legend { font-weight: 700; padding: 0 .35rem; }
 .historique { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .6rem; }
 .historique li { padding-left: .75rem; border-left: 3px solid var(--border); }
 .gate { max-width: 32rem; margin: 4rem auto; padding: 0 1rem; }
+.gate form { display: grid; gap: .75rem; margin-block: 1rem; }
+.espaces { list-style: none; padding: 0; display: grid; gap: .5rem; }
+.espaces .btn { width: 100%; text-align: left; display: flex; flex-direction: column; align-items: flex-start; }
+.codes { columns: 2; list-style: none; padding: 0; }
+.secret { word-break: break-all; font-size: 1.05rem; }
+.topbar .compte { display: flex; align-items: center; gap: .75rem; }
 
 @media (max-width: 40rem) {
   .topbar nav { margin-left: 0; width: 100%; }
   .candidats li { grid-template-columns: auto 1fr; }
   .candidats .infos { grid-column: 2; justify-content: flex-start; }
 }
+
+ul.plain { list-style: none; margin: 0; padding: 0; display: grid; gap: .15rem; }
+.sla { list-style: none; padding: 0; display: grid; gap: .5rem; }
+.famille-ligne .jours { display: flex; flex-wrap: wrap; gap: .5rem; }

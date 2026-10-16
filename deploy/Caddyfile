@@ -1,0 +1,10 @@
+# TLS automatique (Let's Encrypt) ; les noms viennent des variables d'environnement du compose.
+{$API_HOST} {
+	encode zstd gzip
+	reverse_proxy api:3000
+}
+
+{$CONSOLE_HOST} {
+	encode zstd gzip
+	reverse_proxy web:8080
+}

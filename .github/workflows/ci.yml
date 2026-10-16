@@ -34,3 +34,51 @@ jobs:
       - name: Tests (isolation et API sur PostgreSQL réel, paquet partagé, console web)
         run: pnpm test
       - run: pnpm build
+
+  # Images de production : construction, migrations depuis l'image et démarrage de l'API contre une base vierge,
+  # en-têtes de la console. Ne publie rien.
+  docker:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: nova_image
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d nova_image" --health-interval 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Image API
+        run: docker build -t nova-api:ci .
+      - name: Image web
+        run: docker build -f Dockerfile.web --build-arg VITE_API_URL=https://api.ci.test -t nova-web:ci .
+      - name: Migrations et démarrage de l'API depuis l'image
+        run: |
+          set -euo pipefail
+          export DATABASE_URL_ADMIN=postgres://postgres:postgres@localhost:5432/nova_image NOVA_APP_PASSWORD=ci_app_pw
+          docker run --rm --network host -e DATABASE_URL_ADMIN -e NOVA_APP_PASSWORD nova-api:ci node dist/src/db/cli.js bootstrap
+          docker run --rm --network host -e DATABASE_URL_ADMIN nova-api:ci node dist/src/db/cli.js migrate | tee /tmp/migrate.txt
+          grep -q 0007_contrats_calendriers_sla.sql /tmp/migrate.txt
+          docker run -d --name api --network host -e NODE_ENV=production -e PORT=3000 \
+            -e DATABASE_URL_APP=postgres://nova_app:ci_app_pw@localhost:5432/nova_image \
+            -e JWT_SECRET=ci-only-secret-0123456789abcdef0123456789abcdef \
+            -e APP_ENCRYPTION_KEY=$(head -c 32 /dev/zero | base64) nova-api:ci
+          for i in $(seq 1 20); do curl -fsS localhost:3000/health && break || sleep 1; done
+          curl -fsSI localhost:3000/health | grep -i "x-content-type-options: nosniff"
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:3000/sites)" = 401
+          docker logs api | tail -5
+      - name: "Console, en-têtes de sécurité et repli SPA"
+        run: |
+          set -euo pipefail
+          docker run -d --name web -p 8080:8080 -e API_ORIGIN=https://api.ci.test nova-web:ci
+          for i in $(seq 1 20); do curl -fsS localhost:8080/healthz && break || sleep 1; done
+          curl -fsSI localhost:8080/ | grep -i "content-security-policy: .*connect-src 'self' https://api.ci.test"
+          curl -fsSI localhost:8080/ | grep -i "x-content-type-options: nosniff"
+          # les en-têtes doivent aussi être présents sur les fichiers versionnés et sur le contrôle de santé (héritage nginx)
+          ASSET=$(curl -fsS localhost:8080/ | grep -o '/assets/[^"]*\.js' | head -1)
+          curl -fsSI "localhost:8080$ASSET" | grep -i "content-security-policy"
+          curl -fsSI localhost:8080/healthz | grep -i "x-content-type-options: nosniff"
+          curl -fsSI localhost:8080/ | grep -i "cache-control: no-cache\|cache-control: no-store\|cache-control: max-age=0" 
+          curl -fsS localhost:8080/mot-de-passe/abc | grep -q '<div id="root">'

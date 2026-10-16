@@ -1,10 +1,13 @@
 import { createContext, useContext } from 'react';
 import { type Repository, aujourdhuiParis } from '@nova/shared';
+import type { AuthClient } from './auth';
 
 export interface AppContextValue {
   repo: Repository;
   /** Date du jour (Paris), injectable pour les tests. */
   today: () => string;
+  /** Présent en mode API : connexion, espace de travail, déconnexion. */
+  auth?: AuthClient;
   /** Appelée après une réinitialisation des données de démonstration. */
   onReset?: () => void;
 }

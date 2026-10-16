@@ -43,7 +43,12 @@ describe('détail du ticket et affectation', () => {
     expect(screen.getAllByText('Affecté').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Réaffecter à Aqua-Rapide (démo)' })).toBeInTheDocument();
     expect(screen.getByText(/Motif : Intervention sous 4 h/)).toBeInTheDocument();
-    expect(screen.getByText('En cours')).toBeInTheDocument();
+    expect(within(screen.getByRole('heading', { name: 'Historique des affectations' }).closest('section')!).getByText('En cours')).toBeInTheDocument();
+    // le contrat de Hydro-Services couvre ce site et cette famille (P2) : les échéances démarrent à l'affectation
+    const sla = within(screen.getByRole('heading', { name: 'Échéances SLA' }).closest('section')!);
+    expect(sla.getByText(/Prise en compte/)).toBeInTheDocument();
+    expect(sla.getByText(/Résolution/)).toBeInTheDocument();
+    expect(sla.getByText(/Contrat : Plomberie et CVC/)).toBeInTheDocument();
     const t = (await repo.listTickets()).find((x) => x.titre.startsWith('Fuite sous'))!;
     expect([t.statut, t.prestataire_actuel]).toEqual(['affecte', 'Hydro-Services (démo)']);
   });
@@ -90,5 +95,44 @@ describe('détail du ticket et affectation', () => {
   it('ticket introuvable : message d\'erreur avec nouvel essai', async () => {
     renderApp('/tickets/00000000-0000-4000-8000-0000000000ff');
     expect(await screen.findByRole('alert')).toHaveTextContent('Ticket introuvable');
+  });
+});
+
+describe('échéances SLA dans le détail du ticket', () => {
+  it('ticket non affecté : explique que les échéances démarrent à l\'affectation', async () => {
+    await ouvrir(/Serrure de la porte du hall/);
+    const sla = within(screen.getByRole('heading', { name: 'Échéances SLA' }).closest('section')!);
+    expect(sla.getByText(/démarrent à l'affectation/)).toBeInTheDocument();
+  });
+
+  it('affecté sans règle pour cette priorité : le dit sans parler d\'erreur', async () => {
+    const { user } = await ouvrir(/Serrure de la porte du hall/);
+    await user.click(screen.getByRole('button', { name: /Affecter à Clés & Sécurité/ }));
+    await screen.findByText(/Ticket affecté à Clés & Sécurité/);
+    const sla = within(screen.getByRole('heading', { name: 'Échéances SLA' }).closest('section')!);
+    expect(sla.getByText(/Aucune échéance suivie/)).toBeInTheDocument();
+  });
+
+  it('échéances de la démonstration : prise en compte dépassée, résolution en cours', async () => {
+    await ouvrir(/Chauffe-eau du logement 12/);
+    const sla = within(screen.getByRole('heading', { name: 'Échéances SLA' }).closest('section')!);
+    const [pec, res] = sla.getAllByRole('listitem');
+    expect(within(pec!).getByText('Dépassé')).toBeInTheDocument();
+    expect(within(res!).getByText('En cours')).toBeInTheDocument();
+  });
+
+  it('la réaffectation remplace les échéances par celles du nouveau contrat', async () => {
+    const { user } = await ouvrir(/Chauffe-eau du logement 12/);
+    await user.click(screen.getByRole('button', { name: 'Réaffecter à Aqua-Rapide (démo)' }));
+    await screen.findByText('Ticket affecté à Aqua-Rapide (démo).');
+    const sla = within(screen.getByRole('heading', { name: 'Échéances SLA' }).closest('section')!);
+    expect(sla.getByText(/Contrat : Plomberie — Résidence des Lilas/)).toBeInTheDocument();
+    expect(within(sla.getAllByRole('listitem')[0]!).getByText('En cours')).toBeInTheDocument();
+  });
+
+  it('motif « aucun contrat » affiché quand le contrat est exigé', async () => {
+    const r = demo((d) => { d.parametres.exiger_contrat = true; });
+    await ouvrir(/Serrure de la porte du hall/, r);
+    expect(screen.getAllByText('Aucun contrat actif pour ce site et cette famille')).toHaveLength(2);
   });
 });

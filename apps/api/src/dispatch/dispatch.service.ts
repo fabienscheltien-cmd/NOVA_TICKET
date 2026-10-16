@@ -1,11 +1,12 @@
 import type pg from 'pg';
 import {
-  FAMILLES_STANDARD, codeDepuisLibelle, type Famille, type Prestataire, type Selection, type Ticket, type TicketDetail,
+  FAMILLES_STANDARD, aujourdhuiParis, codeDepuisLibelle, contratPourSla, planifierSla, type Famille, type Prestataire, type Selection, type SlaInstance, type Ticket, type TicketDetail,
   affectationInputSchema, famillePatchSchema, familleCreateSchema, prestataireInputSchema, prestatairePatchSchema, ticketCreateSchema,
 } from '@nova/shared';
 import { AuthError } from '../auth/errors.js';
 import type { TenantContext, TenantDb } from '../db/tenant-db.js';
 import { type Page, insertRow } from '../patrimoine/patrimoine.service.js';
+import { chargerPourSla } from './contrats.service.js';
 
 type Row = Record<string, unknown>;
 const notFound = (what: string) => new AuthError('not_found', 404, `${what} introuvable`);
@@ -156,7 +157,33 @@ export class DispatchService {
     const historique = (await c.query(
       `SELECT id, annuaire_id, prestataire_nom, affecte_at, fin_at, motif FROM affectation_ticket
         WHERE ticket_id = $1 ORDER BY affecte_at DESC, rang DESC`, [ticketId])).rows as TicketDetail['historique'];
-    return { ...t, historique, selection: await this.selection(c, ticketId) };
+    const sla = (await c.query(
+      `SELECT i.id, i.type, i.depart_at, i.delai_minutes, i.echeance_at,
+              CASE WHEN now() > i.echeance_at THEN 'depasse' ELSE 'en_cours' END AS etat, k.libelle AS contrat_libelle
+         FROM sla_instance i JOIN contrat_service k ON k.id = i.contrat_id AND k.org_id = i.org_id
+        WHERE i.ticket_id = $1 AND i.remplace_at IS NULL
+        ORDER BY (i.type = 'resolution')`, [ticketId])).rows as SlaInstance[];
+    return { ...t, historique, selection: await this.selection(c, ticketId), sla };
+  }
+
+  /**
+   * Après une affectation : les échéances de la précédente cessent d'être suivies, celles du contrat qui couvre
+   * (prestataire, site, famille) et définit une règle pour la priorité démarrent. Dans la même transaction.
+   */
+  private async ouvrirSla(c: pg.PoolClient, ticketId: string): Promise<void> {
+    await c.query('UPDATE sla_instance SET remplace_at = now() WHERE ticket_id = $1 AND remplace_at IS NULL', [ticketId]);
+    const t = (await c.query<{ site_id: string; famille_id: string; priorite: 'p1' | 'p2' | 'p3' | 'p4'; created_at: Date }>(
+      'SELECT site_id, famille_id, priorite, created_at FROM ticket WHERE id = $1', [ticketId])).rows[0]!;
+    const aff = (await c.query<{ id: string; annuaire_id: string; affecte_at: Date }>(
+      'SELECT id, annuaire_id, affecte_at FROM affectation_ticket WHERE ticket_id = $1 AND fin_at IS NULL', [ticketId])).rows[0]!;
+    const { contrats, calendriers } = await chargerPourSla(c);
+    const contrat = contratPourSla(contrats, { annuaire_id: aff.annuaire_id, site_id: t.site_id, famille_id: t.famille_id }, t.priorite, aujourdhuiParis());
+    if (!contrat) return;
+    for (const p of planifierSla({ contrat, priorite: t.priorite, creeLe: t.created_at, affecteLe: aff.affecte_at, calendriers })) {
+      await c.query(
+        `INSERT INTO sla_instance (org_id, ticket_id, affectation_id, contrat_id, type, depart_at, delai_minutes, echeance_at)
+         VALUES (app.current_org(), $1, $2, $3, $4, $5, $6, $7)`, [ticketId, aff.id, contrat.id, p.type, p.depart, p.delai_minutes, p.echeance]);
+    }
   }
   getTicket(ctx: TenantContext, id: string) { return this.run(ctx, (c) => this.detail(c, id)); }
 
@@ -197,6 +224,7 @@ export class DispatchService {
         if (e.code === '42501') throw notFound('Ticket');
         throw err;
       }
+      await this.ouvrirSla(c, ticketId);
       return this.detail(c, ticketId);
     });
   }

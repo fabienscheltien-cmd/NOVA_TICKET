@@ -6,6 +6,7 @@ export interface AuthConfig {
   refreshTtlSec: number;
   mfaTokenTtlSec: number;
   invitationTtlSec: number;
+  passwordResetTtlSec: number;
   issuer: string;
   appBaseUrl: string;
 }
@@ -22,6 +23,7 @@ export function loadAuthConfig(env: NodeJS.ProcessEnv = process.env): AuthConfig
     refreshTtlSec: 30 * 24 * 3600,
     mfaTokenTtlSec: 5 * 60,
     invitationTtlSec: 7 * 24 * 3600,
+    passwordResetTtlSec: 30 * 60,
     issuer: 'nova-ticket',
     appBaseUrl: env.APP_BASE_URL ?? 'http://localhost:5173',
   };

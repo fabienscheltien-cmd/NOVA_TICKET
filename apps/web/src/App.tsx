@@ -1,28 +1,29 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { DEMO_LABEL, DemoRepository } from '@nova/shared';
 import { useApp } from './context';
 import { AnnuairePage } from './pages/Annuaire';
+import { CalendriersPage } from './pages/Calendriers';
+import { ContratsPage } from './pages/Contrats';
 import { FamillesPage } from './pages/Familles';
 import { TicketDetailPage } from './pages/TicketDetail';
 import { TicketsPage } from './pages/Tickets';
-import { TOKEN_KEY } from './config';
+import { ConnexionPage, InvitationPage, MotDePasseOubliePage, ReinitialisationPage } from './pages/Connexion';
 
 export function App() {
-  const { repo, onReset } = useApp();
+  const { repo, onReset, auth } = useApp();
   const [version, setVersion] = useState(0);
-  const [token, setToken] = useState(() => (repo.mode === 'api' ? localStorage.getItem(TOKEN_KEY) ?? '' : 'demo'));
+  const [session, setSession] = useState(() => auth?.session() ?? null);
+  useEffect(() => (auth ? auth.subscribe(() => setSession(auth.session())) : undefined), [auth]);
 
-  if (!token) {
+  if (auth && !session) {
     return (
-      <main className="gate">
-        <h1>Console NOVA — mode API</h1>
-        <p>Collez le jeton d'accès de votre espace de travail (obtenu par <code>POST /me/workspace/switch</code>). Il est conservé dans ce navigateur uniquement.</p>
-        <form onSubmit={(e) => { e.preventDefault(); const v = new FormData(e.currentTarget).get('jeton'); if (typeof v === 'string' && v.trim()) { localStorage.setItem(TOKEN_KEY, v.trim()); setToken(v.trim()); } }}>
-          <div className="field"><label htmlFor="jeton">Jeton d'accès</label><input id="jeton" name="jeton" type="password" autoComplete="off" required /></div>
-          <button type="submit" className="btn btn-primary">Continuer</button>
-        </form>
-      </main>
+      <Routes>
+        <Route path="/mot-de-passe-oublie" element={<MotDePasseOubliePage />} />
+        <Route path="/mot-de-passe/:token" element={<ReinitialisationPage />} />
+        <Route path="/invitations/:token" element={<InvitationPage />} />
+        <Route path="*" element={<ConnexionPage />} />
+      </Routes>
     );
   }
 
@@ -43,8 +44,16 @@ export function App() {
         <nav aria-label="Navigation principale">
           <NavLink to="/tickets">Tickets</NavLink>
           <NavLink to="/annuaire">Annuaire</NavLink>
+          <NavLink to="/contrats">Contrats</NavLink>
+          <NavLink to="/calendriers">Calendriers</NavLink>
           <NavLink to="/familles">Familles</NavLink>
         </nav>
+        {auth && session && (
+          <div className="compte">
+            <span className="sous">{session.orgNom}</span>
+            <button type="button" className="btn" onClick={() => void auth.deconnexion()}>Se déconnecter</button>
+          </div>
+        )}
       </header>
       <main id="contenu" tabIndex={-1} key={version}>
         <Routes>
@@ -52,7 +61,10 @@ export function App() {
           <Route path="/tickets" element={<TicketsPage />} />
           <Route path="/tickets/:id" element={<TicketDetailPage />} />
           <Route path="/annuaire" element={<AnnuairePage />} />
+          <Route path="/contrats" element={<ContratsPage />} />
+          <Route path="/calendriers" element={<CalendriersPage />} />
           <Route path="/familles" element={<FamillesPage />} />
+          <Route path="/invitations/:token" element={auth ? <InvitationPage /> : <Navigate to="/tickets" replace />} />
           <Route path="*" element={<section><h1>Page introuvable</h1><p><NavLink to="/tickets">Retour aux tickets</NavLink></p></section>} />
         </Routes>
       </main>

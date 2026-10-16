@@ -1,5 +1,7 @@
 export * from './types.js';
 export * from './eligibilite.js';
+export * from './sla.js';
+export * from './contrats.js';
 export * from './familles.js';
 export * from './schemas.js';
 export * from './repository.js';

@@ -144,6 +144,25 @@ export class AuthService {
     return { backup_codes: codes };
   }
 
+  // --- Mot de passe oublié -----------------------------------------------------------------------
+  /** Réponse identique que l'adresse existe ou non ; l'e-mail (simulé) n'est envoyé que si une demande a été créée. */
+  async requestPasswordReset(rawEmail: string): Promise<void> {
+    const token = randomToken();
+    const expiresAt = new Date(Date.now() + this.cfg.passwordResetTtlSec * 1000);
+    const [r] = await this.q<{ to: string | null }>('SELECT app.password_reset_create($1, $2, $3) AS "to"', [normEmail(rawEmail), sha256Hex(token), expiresAt]);
+    if (r?.to) await this.mailer.sendPasswordReset({ to: r.to, expiresAt, link: `${this.cfg.appBaseUrl}/mot-de-passe/${token}` });
+  }
+
+  async resetPassword(token: string, password: string): Promise<void> {
+    assertPassword(password);
+    try {
+      await this.q('SELECT app.password_reset_consume($1, $2)', [sha256Hex(token), await hashPassword(password)]);
+    } catch (err) {
+      if ((err as { code?: string }).code === '42501') throw new AuthError('invalid_reset_link', 400, 'Lien invalide ou expiré');
+      throw err;
+    }
+  }
+
   // --- Invitations ----------------------------------------------------------------------------
   async createInvitation(ctx: TenantContext, input: { email: string; role: string }): Promise<{ id: string; expires_at: Date }> {
     const email = normEmail(input.email);

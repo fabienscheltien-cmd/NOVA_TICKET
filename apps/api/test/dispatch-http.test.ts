@@ -9,6 +9,7 @@ import { MFA_SECRET, type TestApp, startTestApp } from './http-helpers.js';
 
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const P4 = uuid(41); const P5 = uuid(42); const P6 = uuid(43); const P7 = uuid(44);
+const SUP = [uuid(45), uuid(46), uuid(47), uuid(48), uuid(49)];
 
 let admin: pg.Client;
 let t: TestApp;
@@ -18,7 +19,7 @@ let localA = ''; let localB = '';
 async function preparer() {
   admin = await adminClient();
   await seed(admin);
-  for (const [id, nom] of [[P4, 'Prestataire 4'], [P5, 'Prestataire 5'], [P6, 'Prestataire 6'], [P7, 'Prestataire 7']] as const) {
+  for (const [id, nom] of [[P4, 'Prestataire 4'], [P5, 'Prestataire 5'], [P6, 'Prestataire 6'], [P7, 'Prestataire 7'], ...SUP.map((id, n) => [id, `Prestataire sup ${n}`] as const)] as const) {
     await admin.query("INSERT INTO organisation (id, type, nom) VALUES ($1, 'prestataire', $2)", [id, nom]);
   }
   const mkLocal = async (site: string, nom: string, qr: string) => {
@@ -44,7 +45,7 @@ async function preparer() {
   const repo: Repository = new ApiRepository({ baseUrl: t.base, getToken: () => tokens.pm1! });
   return {
     repo,
-    fixtures: { siteId: ID.siteB1a, localId: localA, localAutreSiteId: localB, orgIds: [ID.P1, ID.P2, ID.P3, ID.S1, P4] },
+    fixtures: { siteId: ID.siteB1a, localId: localA, localAutreSiteId: localB, autreSiteId: ID.siteB1b, orgIds: [ID.P1, ID.P2, ID.P3, ID.S1, P4, ...SUP] },
     // Back-office (connexion propriétaire) : l'API elle-même interdit le rattachement par identifiant.
     rattacher: async (annuaireId: string, orgId: string) => { await admin.query('UPDATE prestataire_annuaire SET prestataire_org_id = $1 WHERE id = $2', [orgId, annuaireId]); },
   };

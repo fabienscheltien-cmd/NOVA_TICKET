@@ -52,11 +52,11 @@ export const tenantDb = (pool: pg.Pool) => new TenantDb(pool);
 
 // Tables lisibles par nova_app : sans espace de travail, elles doivent toutes renvoyer 0 ligne.
 export const DATA_TABLES = [
-  'message', 'fil_participant', 'fil', 'acces_objet', 'affectation_ticket', 'ticket', 'prestataire_famille', 'prestataire_annuaire', 'famille_ticket', 'occupation', 'contact', 'occupant', 'local', 'niveau', 'batiment',
+  'sla_instance', 'sla_regle', 'contrat_perimetre', 'contrat_service', 'calendrier_fermeture', 'calendrier_ouvre', 'message', 'fil_participant', 'fil', 'acces_objet', 'affectation_ticket', 'ticket', 'prestataire_famille', 'prestataire_annuaire', 'famille_ticket', 'occupation', 'contact', 'occupant', 'local', 'niveau', 'batiment',
   'site', 'mandat_gestion', 'portefeuille', 'appartenance', 'utilisateur', 'organisation', 'invitation',
 ] as const;
 // Tables d'authentification : aucun droit pour nova_app.
-export const AUTH_TABLES = ['credential', 'code_secours', 'session_refresh'] as const;
+export const AUTH_TABLES = ['credential', 'code_secours', 'session_refresh', 'password_reset'] as const;
 
 /** Vide et reconstruit le jeu de données de test (connexion administrateur, hors RLS). */
 export async function seed(admin: pg.Client): Promise<void> {
