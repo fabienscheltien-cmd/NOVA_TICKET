@@ -1,6 +1,6 @@
 # NOVA Ticket — plateforme SaaS de Facility Management
 
-Statut : **Phase 2 en cours** — API (identité, patrimoine, annuaire et affectation), console d'administration web (données de démonstration ou API), paquet partagé. Voir `docs/ops/dev.md` pour lancer le projet.
+Statut : **Phase 2 en cours** — API (identité, mot de passe oublié, patrimoine, annuaire et affectation, contrats et SLA), console d'administration web avec écran de connexion (données de démonstration ou API), paquet partagé. Voir `docs/ops/dev.md` pour lancer le projet.
 
 ## Documents
 
@@ -17,6 +17,7 @@ Statut : **Phase 2 en cours** — API (identité, patrimoine, annuaire et affect
 | [docs/phase1/08-cout-hebergement.md](docs/phase1/08-cout-hebergement.md) | Coût OVH et modèle de facturation |
 | [docs/phase1/09-tests-isolation.md](docs/phase1/09-tests-isolation.md) | Plan de tests d'isolation |
 | [docs/phase2/annuaire-et-affectation.md](docs/phase2/annuaire-et-affectation.md) | Annuaire des prestataires, familles, éligibilité, affectation, console web |
+| [docs/phase2/contrats-et-sla.md](docs/phase2/contrats-et-sla.md) | Contrats de service, calendriers ouvrés, SLA, éligibilité par contrat |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | Journal des décisions (alternative écartée) |
 
 ## Convention de lecture

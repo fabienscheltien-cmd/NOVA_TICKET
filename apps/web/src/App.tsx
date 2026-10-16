@@ -3,6 +3,8 @@ import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { DEMO_LABEL, DemoRepository } from '@nova/shared';
 import { useApp } from './context';
 import { AnnuairePage } from './pages/Annuaire';
+import { CalendriersPage } from './pages/Calendriers';
+import { ContratsPage } from './pages/Contrats';
 import { FamillesPage } from './pages/Familles';
 import { TicketDetailPage } from './pages/TicketDetail';
 import { TicketsPage } from './pages/Tickets';
@@ -42,6 +44,8 @@ export function App() {
         <nav aria-label="Navigation principale">
           <NavLink to="/tickets">Tickets</NavLink>
           <NavLink to="/annuaire">Annuaire</NavLink>
+          <NavLink to="/contrats">Contrats</NavLink>
+          <NavLink to="/calendriers">Calendriers</NavLink>
           <NavLink to="/familles">Familles</NavLink>
         </nav>
         {auth && session && (
@@ -57,6 +61,8 @@ export function App() {
           <Route path="/tickets" element={<TicketsPage />} />
           <Route path="/tickets/:id" element={<TicketDetailPage />} />
           <Route path="/annuaire" element={<AnnuairePage />} />
+          <Route path="/contrats" element={<ContratsPage />} />
+          <Route path="/calendriers" element={<CalendriersPage />} />
           <Route path="/familles" element={<FamillesPage />} />
           <Route path="/invitations/:token" element={auth ? <InvitationPage /> : <Navigate to="/tickets" replace />} />
           <Route path="*" element={<section><h1>Page introuvable</h1><p><NavLink to="/tickets">Retour aux tickets</NavLink></p></section>} />

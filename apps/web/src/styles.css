@@ -142,3 +142,7 @@ legend { font-weight: 700; padding: 0 .35rem; }
   .candidats li { grid-template-columns: auto 1fr; }
   .candidats .infos { grid-column: 2; justify-content: flex-start; }
 }
+
+ul.plain { list-style: none; margin: 0; padding: 0; display: grid; gap: .15rem; }
+.sla { list-style: none; padding: 0; display: grid; gap: .5rem; }
+.famille-ligne .jours { display: flex; flex-wrap: wrap; gap: .5rem; }

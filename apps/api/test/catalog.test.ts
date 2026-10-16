@@ -10,7 +10,7 @@ const SECURITY_DEFINER_ALLOWLIST = [
   'app.resolve_membership', 'app.revoke_ticket_share', 'app.session_create', 'app.session_revoke',
   'app.session_revoke_user', 'app.session_rotate', 'app.share_ticket', 'app.trg_appartenance_role',
   'app.affecter_ticket', 'app.trg_annuaire_check', 'app.trg_mandat_check', 'app.user_deactivate', 'app.visible_sites', 'app.has_mandate_for', 'app.workspaces_of',
-  'app.inviter_prestataire', 'app.org_membres', 'app.password_reset_create', 'app.password_reset_consume',
+  'app.inviter_prestataire', 'app.org_membres', 'app.password_reset_create', 'app.password_reset_consume', 'app.set_exiger_contrat',
 ];
 
 describe('niveau 1 — catalogue', () => {

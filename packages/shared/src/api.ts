@@ -1,6 +1,6 @@
-import type { AffectationInput, FamilleCreate, FamillePatch, PrestataireInput, PrestatairePatch, TicketCreate } from './schemas.js';
-import { type ErrorCode, RepositoryError, type PrestataireFilters, type Repository, type TicketFilters } from './repository.js';
-import type { Famille, Local, Prestataire, Site, StatutPrestataire, Ticket, TicketDetail } from './types.js';
+import type { AffectationInput, CalendrierInput, ContratInput, ContratPatch, FamilleCreate, ParametresInput, FamillePatch, PrestataireInput, PrestatairePatch, TicketCreate } from './schemas.js';
+import { type ContratFilters, type ErrorCode, RepositoryError, type PrestataireFilters, type Repository, type TicketFilters } from './repository.js';
+import type { Calendrier, Contrat, Famille, Local, Parametres, Prestataire, Site, StatutPrestataire, Ticket, TicketDetail } from './types.js';
 
 export interface ApiOptions {
   baseUrl: string;
@@ -68,6 +68,20 @@ export class ApiRepository implements Repository {
   updatePrestataire(id: string, patch: PrestatairePatch) { return this.call<Prestataire>('PATCH', `/annuaire/${id}`, patch); }
   inviterPrestataire(id: string, email: string) { return this.call<Prestataire>('POST', `/annuaire/${id}/invitation`, { email }); }
   setStatutPrestataire(id: string, statut: StatutPrestataire) { return this.call<Prestataire>('POST', `/annuaire/${id}/statut`, { statut }); }
+
+  async listCalendriers() { return (await this.call<{ items: Calendrier[] }>('GET', '/calendriers')).items; }
+  createCalendrier(input: CalendrierInput) { return this.call<Calendrier>('POST', '/calendriers', input); }
+  updateCalendrier(id: string, input: CalendrierInput) { return this.call<Calendrier>('PUT', `/calendriers/${id}`, input); }
+
+  async listContrats(f: ContratFilters = {}) {
+    return (await this.call<{ items: Contrat[] }>('GET', `/contrats${this.qs({ annuaire_id: f.annuaire_id, statut: f.statut, limit: 500 })}`)).items;
+  }
+  getContrat(id: string) { return this.call<Contrat>('GET', `/contrats/${id}`); }
+  createContrat(input: ContratInput) { return this.call<Contrat>('POST', '/contrats', input); }
+  updateContrat(id: string, patch: ContratPatch) { return this.call<Contrat>('PATCH', `/contrats/${id}`, patch); }
+
+  getParametres() { return this.call<Parametres>('GET', '/parametres'); }
+  setParametres(input: ParametresInput) { return this.call<Parametres>('PUT', '/parametres', input); }
 
   async listSites(): Promise<Site[]> {
     return (await this.call<{ items: Array<{ id: string; nom: string }> }>('GET', '/sites?limit=500')).items.map((s) => ({ id: s.id, nom: s.nom }));

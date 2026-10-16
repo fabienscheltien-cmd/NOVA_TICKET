@@ -9,7 +9,7 @@
 | Méthode | Route | Rôle |
 |---|---|---|
 | POST | `/auth/login` · `/auth/mfa/verify` · `/auth/refresh` · `/auth/logout` | Authentification |
-| POST | `/auth/password/forgot` · `/auth/password/reset` | Mot de passe |
+| POST | `/auth/password/forgot` (202 uniforme) · `/auth/password/reset` | Mot de passe (implémenté) |
 | GET | `/me` · `/me/workspaces` | Profil, organisations accessibles |
 | POST | `/me/workspace/switch` | Changer d'espace de travail |
 | POST | `/invitations` · `/invitations/{token}/accept` | Invitations |
@@ -53,6 +53,9 @@
 | POST | `/annuaire/{id}/statut` (`actif` / `suspendu`) | `config.manage` |
 | POST | `/tickets` (`titre`, `famille_id`, `site_id`, `local_id?`, `priorite?`) : renvoie le détail avec la sélection des éligibles | `ticket.create` |
 | GET | `/tickets` · `/tickets/{id}` (détail : historique des affectations, `selection.eligibles`, `selection.suggere`) | `ticket.read` |
+| GET · POST · PUT | `/calendriers` · `/calendriers/{id}` (plages, fermetures ; PUT remplace) | `contrat.read` · `sla.configure` |
+| GET · POST · PATCH | `/contrats` (filtres `annuaire_id`, `statut`) · `/contrats/{id}` (`perimetre` et `regles` remplacent s'ils sont fournis) | `contrat.read` · `sla.configure` |
+| GET · PUT | `/parametres` (`exiger_contrat`) | `contrat.read` · `sla.configure` |
 | POST | `/annuaire/{id}/invitation` (`email`) : invite le prestataire à créer son compte ; 200 + fiche, 404, 409 `deja_rattache`, 400 | `config.manage` |
 | GET | `/organisation/membres` · `/organisation/invitations` : tout le compte de l'administrateur | `user.manage` |
 | POST | `/invitations/{id}/revoke` : 204, 404 si inconnue ou déjà traitée | `user.invite` |

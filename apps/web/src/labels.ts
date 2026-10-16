@@ -26,3 +26,21 @@ export function etatAssurance(expire: string | null, aujourdhui: string): EtatAs
   const jours = (Date.parse(`${expire}T00:00:00Z`) - Date.parse(`${aujourdhui}T00:00:00Z`)) / 86_400_000;
   return jours <= 30 ? 'bientot' : 'valide';
 }
+
+/** 90 → « 1 h 30 », 2880 → « 2 j » (jours de 24 h) : les délais sont saisis en minutes. */
+export function duree(minutes: number): string {
+  const j = Math.floor(minutes / 1440); const h = Math.floor((minutes % 1440) / 60); const m = minutes % 60;
+  const parts = [j ? `${j} j` : '', h ? `${h} h` : '', m ? `${m} min` : ''].filter(Boolean);
+  return parts.length ? parts.join(' ') : '0 min';
+}
+
+export const JOURS_SEMAINE = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+/** [1,2,3,4,5] → « Lun–Ven » ; sinon liste. */
+export function libelleJours(jours: number[]): string {
+  const j = [...jours].sort((a, b) => a - b);
+  const continu = j.every((v, i) => i === 0 || v === j[i - 1]! + 1);
+  if (j.length > 2 && continu) return `${JOURS_SEMAINE[j[0]! - 1]}–${JOURS_SEMAINE[j[j.length - 1]! - 1]}`;
+  return j.map((v) => JOURS_SEMAINE[v - 1]).join(', ');
+}
+export const ETATS_SLA = { en_cours: 'En cours', depasse: 'Dépassé' } as const;
+export const TYPES_SLA = { prise_en_compte: 'Prise en compte', resolution: 'Résolution' } as const;

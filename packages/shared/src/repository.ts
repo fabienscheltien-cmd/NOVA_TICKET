@@ -1,7 +1,7 @@
 import type {
-  AffectationInput, FamilleCreate, FamillePatch, PrestataireInput, PrestatairePatch, TicketCreate,
+  AffectationInput, CalendrierInput, ContratInput, ContratPatch, FamilleCreate, FamillePatch, ParametresInput, PrestataireInput, PrestatairePatch, TicketCreate,
 } from './schemas.js';
-import type { Famille, Local, Prestataire, Site, StatutPrestataire, StatutTicket, Ticket, TicketDetail } from './types.js';
+import type { Calendrier, Contrat, Famille, Local, Parametres, Prestataire, Site, StatutPrestataire, StatutTicket, Ticket, TicketDetail } from './types.js';
 
 export type ErrorCode =
   | 'validation' | 'not_found' | 'conflict' | 'forbidden' | 'unauthorized'
@@ -15,6 +15,7 @@ export class RepositoryError extends Error {
 }
 
 export interface PrestataireFilters { q?: string; famille_id?: string; statut?: StatutPrestataire }
+export interface ContratFilters { annuaire_id?: string; statut?: 'actif' | 'suspendu' }
 export interface TicketFilters { statut?: StatutTicket; famille_id?: string }
 
 /**
@@ -42,6 +43,21 @@ export interface Repository {
    * Le rattachement (`prestataire_org_id`) n'est posé qu'à l'acceptation, jamais ici. Refusé si déjà rattaché.
    */
   inviterPrestataire(id: string, email: string): Promise<Prestataire>;
+
+  /** Calendriers ouvrés (heures d'ouverture et fermetures saisies par le client). */
+  listCalendriers(): Promise<Calendrier[]>;
+  createCalendrier(input: CalendrierInput): Promise<Calendrier>;
+  /** Remplace entièrement le calendrier (plages et fermetures comprises). */
+  updateCalendrier(id: string, input: CalendrierInput): Promise<Calendrier>;
+
+  listContrats(filters?: ContratFilters): Promise<Contrat[]>;
+  getContrat(id: string): Promise<Contrat>;
+  createContrat(input: ContratInput): Promise<Contrat>;
+  /** Si `perimetre` ou `regles` est fourni, il REMPLACE l'ensemble existant. */
+  updateContrat(id: string, patch: ContratPatch): Promise<Contrat>;
+
+  getParametres(): Promise<Parametres>;
+  setParametres(input: ParametresInput): Promise<Parametres>;
 
   listSites(): Promise<Site[]>;
   listLocaux(siteId: string): Promise<Local[]>;

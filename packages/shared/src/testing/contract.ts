@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { FAMILLES_STANDARD } from '../familles.js';
+import { CALENDRIER_24_7 } from '../sla.js';
 import { RepositoryError, type Repository } from '../repository.js';
 import type { Famille, Prestataire, TicketDetail } from '../types.js';
 
@@ -11,7 +12,9 @@ export interface ContractHarness {
     localId: string;
     /** Local d'un AUTRE site, pour tester l'incohérence site / local. */
     localAutreSiteId: string;
-    /** Au moins cinq identifiants de comptes prestataires distincts (rattachement). */
+    /** Un AUTRE site que `siteId` (périmètre des contrats). */
+    autreSiteId: string;
+    /** Au moins dix identifiants de comptes prestataires distincts (rattachement). */
     orgIds: string[];
   };
   /**
@@ -223,6 +226,156 @@ export function runRepositoryContract(nom: string, preparer: () => Promise<Contr
       assert.ok((await repo.listSites()).some((x) => x.id === fixtures.siteId));
       assert.ok((await repo.listLocaux(fixtures.siteId)).some((x) => x.id === fixtures.localId));
       assert.ok(!(await repo.listLocaux(fixtures.siteId)).some((x) => x.id === fixtures.localAutreSiteId));
+    });
+
+    describe('calendriers, contrats, éligibilité par contrat et SLA', () => {
+      const BUREAU = [{ jours: [1, 2, 3, 4, 5], debut: '08:00', fin: '12:00' }, { jours: [1, 2, 3, 4, 5], debut: '14:00', fin: '18:00' }];
+      const H24 = [{ jours: [1, 2, 3, 4, 5, 6, 7], debut: '00:00', fin: '24:00' }];
+      const ID_INCONNU = '00000000-0000-4000-8000-0000000000ab';
+      let famille: Famille; let calBureau: string; let cal24: string;
+      const pr: Record<string, Prestataire> = {};
+
+      it('calendriers : création, validation, doublon, remplacement complet, introuvable', async () => {
+        const { repo } = h;
+        const bureau = await repo.createCalendrier({ nom: `Bureau ${s}`, plages: BUREAU, fermetures: [{ du: '2026-12-25', au: '2026-12-25', libelle: 'Noël' }] });
+        calBureau = bureau.id;
+        assert.equal(bureau.fuseau, 'Europe/Paris');
+        assert.deepEqual(bureau.fermetures, [{ du: '2026-12-25', au: '2026-12-25', libelle: 'Noël' }]);
+        cal24 = (await repo.createCalendrier({ nom: `24h ${s}`, plages: H24 })).id;
+        await refus(repo.createCalendrier({ nom: `Bureau ${s}`, plages: BUREAU }), 'conflict');
+        await refus(repo.createCalendrier({ nom: `X ${s}`, plages: [] }), 'validation');
+        await refus(repo.createCalendrier({ nom: `X ${s}`, plages: [{ jours: [1], debut: '18:00', fin: '08:00' }] }), 'validation');
+        await refus(repo.createCalendrier({ nom: `X ${s}`, plages: [{ jours: [8], debut: '08:00', fin: '18:00' }] }), 'validation');
+        await refus(repo.createCalendrier({ nom: `X ${s}`, fuseau: 'Mars/Olympus', plages: BUREAU }), 'validation');
+        await refus(repo.createCalendrier({ nom: `X ${s}`, plages: BUREAU, fermetures: [{ du: '2026-12-26', au: '2026-12-25' }] }), 'validation');
+        await refus(repo.createCalendrier({ nom: '  ', plages: BUREAU }), 'validation');
+        const modifie = await repo.updateCalendrier(calBureau, { nom: `Bureau ${s}`, plages: [{ jours: [1, 2, 3, 4], debut: '09:00', fin: '17:00' }], fermetures: [] });
+        assert.deepEqual(modifie.plages, [{ jours: [1, 2, 3, 4], debut: '09:00', fin: '17:00' }]);
+        assert.deepEqual(modifie.fermetures, []);
+        await repo.updateCalendrier(calBureau, { nom: `Bureau ${s}`, plages: BUREAU });
+        await refus(repo.updateCalendrier(calBureau, { nom: `24h ${s}`, plages: BUREAU }), 'conflict');
+        await refus(repo.updateCalendrier(ID_INCONNU, { nom: `Z ${s}`, plages: BUREAU }), 'not_found');
+        const liste = await repo.listCalendriers();
+        assert.ok(liste.some((c) => c.id === calBureau) && liste.some((c) => c.id === cal24));
+      });
+
+      it('contrats : création avec périmètre et règles, validation, filtres, remplacement, introuvable', async () => {
+        const { repo, fixtures } = h;
+        famille = await repo.createFamille({ libelle: `Contrat ${s}` });
+        const mk = async (cle: string, nom: string, orgIdx: number) => {
+          const c = await repo.createPrestataire({ nom: `${nom} ${s}`, familles: [{ famille_id: famille.id, priorite: orgIdx }] });
+          await h.rattacher(c.id, fixtures.orgIds[orgIdx]!);
+          pr[cle] = await repo.getPrestataire(c.id);
+        };
+        await mk('couvert', 'Couvert', 5); await mk('autreSite', 'AutreSite', 6); await mk('echu', 'Echu', 7); await mk('suspendu', 'SuspenduContrat', 8); await mk('sans', 'Sans', 9);
+        const base = { annuaire_id: pr.couvert!.id, libelle: `Contrat A ${s}`, date_debut: jour(-30), date_fin: jour(30), calendrier_id: calBureau, perimetre: [{ site_id: fixtures.siteId, famille_id: famille.id }] };
+        const c = await repo.createContrat({ ...base, regles: [
+          { priorite: 'p2', delai_prise_en_compte_min: 60, delai_resolution_min: 480, calendrier_id: cal24 },
+          { priorite: 'p3', delai_prise_en_compte_min: 120, delai_resolution_min: 960 },
+        ] });
+        assert.equal(c.prestataire_nom, pr.couvert!.nom);
+        assert.equal(c.statut, 'actif');
+        assert.deepEqual(c.regles.map((r) => [r.priorite, r.calendrier_id]), [['p2', cal24], ['p3', null]]);
+        assert.deepEqual(c.perimetre, [{ site_id: fixtures.siteId, famille_id: famille.id }]);
+        const sansRegle = await repo.createContrat({ ...base, annuaire_id: pr.autreSite!.id, libelle: `Contrat B ${s}`, perimetre: [{ site_id: fixtures.autreSiteId, famille_id: null }] });
+        assert.deepEqual(sansRegle.regles, []);
+        assert.equal((await repo.getContrat(c.id)).libelle, c.libelle);
+        assert.deepEqual((await repo.listContrats({ annuaire_id: pr.couvert!.id })).map((x) => x.id), [c.id]);
+        assert.ok((await repo.listContrats({ statut: 'suspendu' })).every((x) => x.statut === 'suspendu'));
+
+        await refus(repo.createContrat({ ...base, perimetre: [] }), 'validation');
+        await refus(repo.createContrat({ ...base, libelle: '' }), 'validation');
+        await refus(repo.createContrat({ ...base, date_fin: jour(-31) }), 'validation');
+        await refus(repo.createContrat({ ...base, regles: [{ priorite: 'p1', delai_prise_en_compte_min: 60, delai_resolution_min: 30 }] }), 'validation');
+        await refus(repo.createContrat({ ...base, regles: [{ priorite: 'p1', delai_prise_en_compte_min: 0, delai_resolution_min: 30 }] }), 'validation');
+        await refus(repo.createContrat({ ...base, regles: [{ priorite: 'p1', delai_prise_en_compte_min: 1, delai_resolution_min: 2 }, { priorite: 'p1', delai_prise_en_compte_min: 1, delai_resolution_min: 2 }] }), 'validation');
+        await refus(repo.createContrat({ ...base, perimetre: [{ site_id: fixtures.siteId, famille_id: null }, { site_id: fixtures.siteId, famille_id: null }] }), 'validation');
+        await refus(repo.createContrat({ ...base, annuaire_id: ID_INCONNU }), 'validation');
+        await refus(repo.createContrat({ ...base, calendrier_id: ID_INCONNU }), 'validation');
+        await refus(repo.createContrat({ ...base, perimetre: [{ site_id: ID_INCONNU, famille_id: null }] }), 'validation');
+        await refus(repo.createContrat({ ...base, perimetre: [{ site_id: fixtures.siteId, famille_id: ID_INCONNU }] }), 'validation');
+        await refus(repo.getContrat(ID_INCONNU), 'not_found');
+
+        const maj = await repo.updateContrat(c.id, { notes: 'Note' });
+        assert.equal(maj.notes, 'Note');
+        assert.equal(maj.regles.length, 2, 'règles conservées quand elles ne sont pas fournies');
+        const remplace = await repo.updateContrat(c.id, { regles: [{ priorite: 'p1', delai_prise_en_compte_min: 30, delai_resolution_min: 240 }], perimetre: [{ site_id: fixtures.autreSiteId, famille_id: null }] });
+        assert.deepEqual(remplace.regles.map((r) => r.priorite), ['p1']);
+        assert.deepEqual(remplace.perimetre, [{ site_id: fixtures.autreSiteId, famille_id: null }]);
+        await repo.updateContrat(c.id, { regles: base.perimetre ? [{ priorite: 'p2', delai_prise_en_compte_min: 60, delai_resolution_min: 480, calendrier_id: cal24 }, { priorite: 'p3', delai_prise_en_compte_min: 120, delai_resolution_min: 960 }] : [], perimetre: base.perimetre });
+        await refus(repo.updateContrat(c.id, { date_fin: jour(-31) }), 'validation');
+        await refus(repo.updateContrat(c.id, { perimetre: [] }), 'validation');
+        await refus(repo.updateContrat(ID_INCONNU, { notes: 'x' }), 'not_found');
+        await refus(repo.updateContrat(c.id, {} as never), 'validation');
+        // contrats complémentaires pour les cas d'éligibilité
+        await repo.createContrat({ ...base, annuaire_id: pr.echu!.id, libelle: `Echu ${s}`, date_debut: jour(-60), date_fin: jour(-1), regles: [] });
+        await repo.createContrat({ ...base, annuaire_id: pr.suspendu!.id, libelle: `Suspendu ${s}`, statut: 'suspendu', regles: [] });
+      });
+
+      it('éligibilité par contrat : sans effet par défaut ; avec « exiger un contrat », motif sans_contrat (autre site, échu, suspendu, absent)', async () => {
+        const { repo, fixtures } = h;
+        assert.deepEqual(await repo.getParametres(), { exiger_contrat: false });
+        const t = await repo.createTicket({ titre: `Contrat ${s}`, famille_id: famille.id, site_id: fixtures.siteId, priorite: 'p2' });
+        assert.ok(t.selection.eligibles.every((e) => e.eligible), 'par défaut, aucun contrat n\'est exigé');
+        assert.deepEqual(await repo.setParametres({ exiger_contrat: true }), { exiger_contrat: true });
+        try {
+          const exige = await repo.getTicket(t.id);
+          const raison = (cle: string) => exige.selection.eligibles.find((e) => e.annuaire_id === pr[cle]!.id)!.raison;
+          assert.equal(raison('couvert'), 'ok');
+          assert.equal(raison('autreSite'), 'sans_contrat', 'le contrat couvre un autre site');
+          assert.equal(raison('echu'), 'sans_contrat', 'contrat échu hier');
+          assert.equal(raison('suspendu'), 'sans_contrat', 'contrat suspendu');
+          assert.equal(raison('sans'), 'sans_contrat', 'aucun contrat');
+          assert.equal(exige.selection.suggere, pr.couvert!.id);
+          await refus(repo.affecter(t.id, { annuaire_id: pr.autreSite!.id }), 'non_eligible', 'sans_contrat');
+          // famille NULL = toutes les familles ; une ligne de périmètre pour ce site suffit
+          const larges = await repo.createContrat({ annuaire_id: pr.sans!.id, libelle: `Large ${s}`, date_debut: jour(0), perimetre: [{ site_id: fixtures.siteId, famille_id: null }], regles: [] });
+          assert.equal((await repo.getTicket(t.id)).selection.eligibles.find((e) => e.annuaire_id === pr.sans!.id)!.raison, 'ok', 'contrat à date de début = aujourd\'hui, famille = toutes');
+          await repo.updateContrat(larges.id, { statut: 'suspendu' });
+          assert.equal((await repo.getTicket(t.id)).selection.eligibles.find((e) => e.annuaire_id === pr.sans!.id)!.raison, 'sans_contrat');
+        } finally {
+          await repo.setParametres({ exiger_contrat: false });
+        }
+        await refus(repo.setParametres({ exiger_contrat: 'oui' as never }), 'validation');
+        assert.equal((await repo.getTicket(t.id)).selection.eligibles.find((e) => e.annuaire_id === pr.autreSite!.id)!.raison, 'ok');
+      });
+
+      it('SLA : l\'affectation ouvre la prise en compte (depuis l\'affectation) et la résolution (depuis la création) ; la réaffectation les remplace', async () => {
+        const { repo, fixtures } = h;
+        const t = await repo.createTicket({ titre: `SLA ${s}`, famille_id: famille.id, site_id: fixtures.siteId, priorite: 'p2' });
+        assert.deepEqual(t.sla, []);
+        const a = await repo.affecter(t.id, { annuaire_id: pr.couvert!.id });
+        assert.deepEqual(a.sla.map((x) => x.type), ['prise_en_compte', 'resolution']);
+        const [pec, res] = a.sla as [typeof a.sla[number], typeof a.sla[number]];
+        const ms = (x: string) => new Date(x).getTime();
+        assert.equal(pec.delai_minutes, 60);
+        assert.equal(ms(pec.depart_at), ms(a.historique[0]!.affecte_at));
+        assert.equal(ms(pec.echeance_at) - ms(pec.depart_at), 60 * 60_000, 'calendrier 24/7 de la règle : minutes réelles');
+        assert.equal(res.delai_minutes, 480);
+        assert.equal(ms(res.depart_at), ms(a.created_at));
+        assert.equal(ms(res.echeance_at) - ms(res.depart_at), 480 * 60_000);
+        assert.equal(res.etat, 'en_cours');
+        assert.equal(pec.contrat_libelle, `Contrat A ${s}`);
+        // priorité sans règle : pas de SLA, et ce n'est pas une erreur
+        const sansRegle = await repo.createTicket({ titre: `Sans règle ${s}`, famille_id: famille.id, site_id: fixtures.siteId, priorite: 'p4' });
+        assert.deepEqual((await repo.affecter(sansRegle.id, { annuaire_id: pr.couvert!.id })).sla, []);
+        // réaffectation vers un prestataire sans contrat actif couvrant : les anciennes échéances ne sont plus suivies
+        const re = await repo.affecter(t.id, { annuaire_id: pr.sans!.id });
+        assert.deepEqual(re.sla, []);
+        assert.equal((await repo.getTicket(t.id)).sla.length, 0);
+      });
+
+      it('SLA : calendrier de bureau du contrat (règle sans calendrier propre) → échéance en minutes ouvrées', async () => {
+        const { repo, fixtures } = h;
+        const t = await repo.createTicket({ titre: `Ouvré ${s}`, famille_id: famille.id, site_id: fixtures.siteId, priorite: 'p3' });
+        const a = await repo.affecter(t.id, { annuaire_id: pr.couvert!.id });
+        const [pec] = a.sla;
+        // Même calcul que le serveur, avec le calendrier du contrat (bureau) : la suite vérifie le branchement, sla.test.ts le calcul.
+        const { echeanceOuvree } = await import('../sla.js');
+        const attendu = echeanceOuvree(new Date(pec!.depart_at), 120, { fuseau: 'Europe/Paris', plages: BUREAU, fermetures: [] });
+        assert.equal(new Date(pec!.echeance_at).getTime(), attendu.getTime());
+        assert.ok(CALENDRIER_24_7.plages.length === 1);
+      });
     });
   });
 }

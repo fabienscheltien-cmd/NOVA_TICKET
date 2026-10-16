@@ -3,7 +3,7 @@ import { Link, useLocation, useParams } from 'react-router-dom';
 import { RAISONS_LIBELLES, type TicketDetail } from '@nova/shared';
 import { useApp } from '../context';
 import { messageErreur, useAsync } from '../hooks';
-import { PRIORITES, STATUTS_AFFECTABLES, STATUTS_TICKET, dateHeure } from '../labels';
+import { ETATS_SLA, PRIORITES, STATUTS_AFFECTABLES, STATUTS_TICKET, TYPES_SLA, dateHeure, duree } from '../labels';
 import { Badge, ErrorState, Loading } from '../ui';
 import { tonPriorite, tonStatut } from './Tickets';
 
@@ -128,6 +128,28 @@ function Contenu({ ticket, cree, onChange }: { ticket: TicketDetail; cree: boole
               </button>
             </fieldset>
           </form>
+        )}
+      </section>
+
+      <section aria-labelledby="titre-sla" className="carte">
+        <h2 id="titre-sla">Échéances SLA</h2>
+        {ticket.sla.length === 0 ? (
+          <p className="sous">
+            {actuel ? 'Aucune échéance suivie : aucun contrat actif ne définit de délai pour ce prestataire, ce site, cette famille et cette priorité.' : 'Les échéances démarrent à l\'affectation, selon le contrat du prestataire.'}
+          </p>
+        ) : (
+          <>
+            <ul className="sla">
+              {ticket.sla.map((x) => (
+                <li key={x.id}>
+                  <strong>{TYPES_SLA[x.type]}</strong> : avant le {dateHeure(x.echeance_at)}{' '}
+                  <span className="sous">({duree(x.delai_minutes)} ouvrées depuis le {dateHeure(x.depart_at)})</span>{' '}
+                  <Badge ton={x.etat === 'depasse' ? 'danger' : 'ok'}>{ETATS_SLA[x.etat]}</Badge>
+                </li>
+              ))}
+            </ul>
+            <p className="help">Contrat : {ticket.sla[0]!.contrat_libelle}. Visible de votre organisation seulement.</p>
+          </>
         )}
       </section>
 

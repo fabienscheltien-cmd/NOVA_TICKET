@@ -12,8 +12,8 @@ runRepositoryContract('DemoRepository', () => {
   return {
     repo,
     fixtures: {
-      siteId: uuid(300), localId: uuid(400), localAutreSiteId: uuid(403),
-      orgIds: [uuid(801), uuid(802), uuid(803), uuid(804), uuid(805)],
+      siteId: uuid(300), localId: uuid(400), localAutreSiteId: uuid(403), autreSiteId: uuid(301),
+      orgIds: [uuid(801), uuid(802), uuid(803), uuid(804), uuid(805), uuid(806), uuid(807), uuid(808), uuid(809), uuid(810)],
     },
     rattacher: async (id, orgId) => repo.simulerAcceptation(id, orgId),
   };

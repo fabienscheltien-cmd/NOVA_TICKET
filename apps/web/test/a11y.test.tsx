@@ -13,6 +13,8 @@ describe('accessibilité (axe-core)', () => {
     ['/tickets', 'Tickets'],
     ['/annuaire', 'Annuaire des prestataires'],
     ['/familles', 'Familles de tickets'],
+    ['/contrats', 'Contrats de service'],
+    ['/calendriers', 'Calendriers ouvrés'],
   ])('page %s : aucune violation', async (route, titre) => {
     const { container } = renderApp(route);
     await screen.findByRole('heading', { name: titre });
@@ -36,6 +38,20 @@ describe('accessibilité (axe-core)', () => {
     expect(await violations(container)).toEqual([]);
     await user.keyboard('{Escape}');
     renderApp('/tickets');
+  });
+
+  it('fenêtres contrat et calendrier : aucune violation', async () => {
+    const c = renderApp('/contrats');
+    await screen.findAllByRole('row');
+    await c.user.click(screen.getByRole('button', { name: 'Ajouter un contrat' }));
+    await screen.findByRole('dialog');
+    expect(await violations(c.container)).toEqual([]);
+    c.unmount();
+    const k = renderApp('/calendriers');
+    await screen.findAllByRole('row');
+    await k.user.click(screen.getByRole('button', { name: 'Ajouter un calendrier' }));
+    await screen.findByRole('dialog');
+    expect(await violations(k.container)).toEqual([]);
   });
 
   it('états vides et erreurs : aucune violation', async () => {

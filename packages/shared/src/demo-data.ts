@@ -1,5 +1,7 @@
 import { FAMILLES_STANDARD } from './familles.js';
-import type { Priorite, StatutPrestataire, StatutTicket } from './types.js';
+import { type ContratEntree, contratPourSla, planifierSla } from './contrats.js';
+import type { CalendrierCalc } from './sla.js';
+import type { Calendrier, Contrat, Priorite, StatutPrestataire, StatutTicket } from './types.js';
 
 /** Libellé affiché partout où des données de démonstration apparaissent : jamais de données factices non signalées. */
 export const DEMO_LABEL = 'Données de démonstration — fictives, non enregistrées';
@@ -20,8 +22,15 @@ export interface TicketRow {
 export interface AffectationRow {
   id: string; ticket_id: string; annuaire_id: string; prestataire_nom: string; affecte_at: string; fin_at: string | null; motif: string | null;
 }
+export type CalendrierRow = Calendrier;
+export type ContratRow = Omit<Contrat, 'prestataire_nom'>;
+export interface SlaRow {
+  id: string; ticket_id: string; affectation_id: string; contrat_id: string; type: 'prise_en_compte' | 'resolution';
+  depart_at: string; delai_minutes: number; echeance_at: string; remplace_at: string | null;
+}
 export interface DemoData {
   familles: FamilleRow[]; prestataires: PrestataireRow[]; sites: SiteRow[]; locaux: LocalRow[]; tickets: TicketRow[]; affectations: AffectationRow[];
+  calendriers: CalendrierRow[]; contrats: ContratRow[]; sla: SlaRow[]; parametres: { exiger_contrat: boolean };
 }
 
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -94,5 +103,40 @@ export function creerDonneesDemo(aujourdhui: string): DemoData {
   const affectations: AffectationRow[] = [
     { id: uuid(600), ticket_id: tickets[4]!.id, annuaire_id: prestataires[0]!.id, prestataire_nom: prestataires[0]!.nom, affecte_at: `${jour(aujourdhui, -2)}T10:00:00.000Z`, fin_at: null, motif: null },
   ];
-  return { familles, prestataires, sites, locaux, tickets, affectations };
+  const cal = (n: number, nom: string, plages: Calendrier['plages'], fermetures: Calendrier['fermetures'] = []): CalendrierRow => ({ id: uuid(700 + n), nom, fuseau: 'Europe/Paris', plages, fermetures });
+  const calendriers: CalendrierRow[] = [
+    cal(1, 'Heures de bureau (démo)', [{ jours: [1, 2, 3, 4, 5], debut: '08:00', fin: '12:00' }, { jours: [1, 2, 3, 4, 5], debut: '14:00', fin: '18:00' }],
+      [{ du: jour(aujourdhui, 30), au: jour(aujourdhui, 30), libelle: 'Fermeture exceptionnelle (démo)' }]),
+    cal(2, 'Astreinte 24 h/24 (démo)', [{ jours: [1, 2, 3, 4, 5, 6, 7], debut: '00:00', fin: '24:00' }]),
+  ];
+  const contrat = (n: number, p: PrestataireRow, libelle: string, perimetre: ContratRow['perimetre'], regles: ContratRow['regles'], o: Partial<ContratRow> = {}): ContratRow => ({
+    id: uuid(800 + n), annuaire_id: p.id, libelle, date_debut: jour(aujourdhui, -200), date_fin: jour(aujourdhui, 165), statut: 'actif',
+    calendrier_id: calendriers[0]!.id, notes: null, perimetre, regles, created_at: horodatage, ...o,
+  });
+  const contrats: ContratRow[] = [
+    contrat(1, prestataires[0]!, 'Plomberie et CVC — Horizon, Lilas, Atlas (démo)',
+      [{ site_id: sites[0]!.id, famille_id: fam('plomberie') }, { site_id: sites[0]!.id, famille_id: fam('cvc') }, { site_id: sites[1]!.id, famille_id: fam('plomberie') }, { site_id: sites[2]!.id, famille_id: null }],
+      [{ priorite: 'p1', delai_prise_en_compte_min: 60, delai_resolution_min: 480, calendrier_id: calendriers[1]!.id },
+        { priorite: 'p2', delai_prise_en_compte_min: 120, delai_resolution_min: 960, calendrier_id: null },
+        { priorite: 'p3', delai_prise_en_compte_min: 240, delai_resolution_min: 2400, calendrier_id: null }]),
+    contrat(2, prestataires[1]!, 'Plomberie — Résidence des Lilas (démo)', [{ site_id: sites[1]!.id, famille_id: fam('plomberie') }],
+      [{ priorite: 'p3', delai_prise_en_compte_min: 480, delai_resolution_min: 2880, calendrier_id: null }]),
+    contrat(3, prestataires[3]!, 'Électricité — tous sites (démo)', sites.map((s) => ({ site_id: s.id, famille_id: fam('electricite') })), [], { date_fin: null }),
+    contrat(4, prestataires[6]!, 'Serrurerie — contrat échu (démo)', [{ site_id: sites[1]!.id, famille_id: fam('serrurerie') }],
+      [{ priorite: 'p1', delai_prise_en_compte_min: 60, delai_resolution_min: 240, calendrier_id: calendriers[1]!.id }], { date_debut: jour(aujourdhui, -400), date_fin: jour(aujourdhui, -35) }),
+  ];
+  const parametres = { exiger_contrat: false };
+  // L'affectation de démonstration (ticket 5, chauffe-eau, P3) suit le SLA de son contrat, calculé comme par l'API.
+  const sla: SlaRow[] = [];
+  const cals = new Map<string, CalendrierCalc>(calendriers.map((c) => [c.id, c]));
+  const t5 = tickets[4]!;
+  const a5 = affectations[0]!;
+  const c5 = contratPourSla(contrats satisfies ContratEntree[], { annuaire_id: a5.annuaire_id, site_id: t5.site_id, famille_id: t5.famille_id }, t5.priorite, aujourdhui);
+  if (c5) {
+    planifierSla({ contrat: c5, priorite: t5.priorite, creeLe: new Date(t5.created_at), affecteLe: new Date(a5.affecte_at), calendriers: cals }).forEach((i, n) => sla.push({
+      id: uuid(960 + n), ticket_id: t5.id, affectation_id: a5.id, contrat_id: c5.id, type: i.type, depart_at: i.depart.toISOString(),
+      delai_minutes: i.delai_minutes, echeance_at: i.echeance.toISOString(), remplace_at: null,
+    }));
+  }
+  return { familles, prestataires, sites, locaux, tickets, affectations, calendriers, contrats, sla, parametres };
 }
