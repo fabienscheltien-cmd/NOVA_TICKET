@@ -46,7 +46,7 @@ async function preparer() {
     repo,
     fixtures: { siteId: ID.siteB1a, localId: localA, localAutreSiteId: localB, orgIds: [ID.P1, ID.P2, ID.P3, ID.S1, P4] },
     // Back-office (connexion propriétaire) : l'API elle-même interdit le rattachement par identifiant.
-    rattacher: async (annuaireId, orgId) => { await admin.query('UPDATE prestataire_annuaire SET prestataire_org_id = $1 WHERE id = $2', [orgId, annuaireId]); },
+    rattacher: async (annuaireId: string, orgId: string) => { await admin.query('UPDATE prestataire_annuaire SET prestataire_org_id = $1 WHERE id = $2', [orgId, annuaireId]); },
   };
 }
 
