@@ -17,8 +17,10 @@ Le jeton d'invitation s'affiche une seule fois (seule son empreinte est stockée
 Désactivations d'administration (réservées à la plateforme, sans droit pour l'API) : `SELECT app.user_deactivate('<uuid>')`, `SELECT app.org_deactivate('<uuid>')`.
 
 ## Console d'administration (web)
+
+**Accès de démonstration (`pnpm web`, sans variable) :** l'écran de connexion accepte n'importe quel e-mail et mot de passe, même vides, et entre en administrateur sur des données fictives non enregistrées. Il n'y a ni API ni donnée réelle derrière : rien n'est protégé ni exposé. Cette connexion permissive n'existe **jamais** en mode API (`VITE_DATA_SOURCE=api`, ce que fixe `Dockerfile.web` en production) : test de garde-fou dans `apps/web/test/connexion.test.tsx` et `config.test.ts`. L'API, elle, n'a pas de mode permissif.
 ```bash
-pnpm web                       # http://127.0.0.1:5173, données de démonstration (défaut)
+pnpm web                       # http://127.0.0.1:5173, données de démonstration (défaut) : connexion permissive, voir ci-dessous
 VITE_DATA_SOURCE=api VITE_API_URL=http://localhost:3000 pnpm web   # contre l'API réelle
 ```
 En mode API, la console a son écran de connexion : identifiants, code MFA, activation de la MFA si le rôle l'exige (codes de secours affichés une fois), choix de l'espace de travail, « mot de passe oublié », réinitialisation (`/mot-de-passe/:jeton`) et acceptation d'invitation (`/invitations/:jeton`, les liens des e-mails simulés). Les jetons sont conservés dans le stockage local du navigateur ; le jeton d'accès est rafraîchi automatiquement (une seule rotation à la fois). Voir [annuaire et affectation](../phase2/annuaire-et-affectation.md).

@@ -8,13 +8,20 @@ import { ContratsPage } from './pages/Contrats';
 import { FamillesPage } from './pages/Familles';
 import { TicketDetailPage } from './pages/TicketDetail';
 import { TicketsPage } from './pages/Tickets';
-import { ConnexionPage, InvitationPage, MotDePasseOubliePage, ReinitialisationPage } from './pages/Connexion';
+import { ConnexionDemoPage, ConnexionPage, DEMO_SESSION_KEY, InvitationPage, MotDePasseOubliePage, ReinitialisationPage } from './pages/Connexion';
 
 export function App() {
-  const { repo, onReset, auth } = useApp();
+  const { repo, onReset, auth, demoLogin } = useApp();
+  const [demoNom, setDemoNom] = useState<string | null>(() => {
+    try { return sessionStorage.getItem(DEMO_SESSION_KEY); } catch { return null; }
+  });
+  const entrerDemo = (nom: string) => { try { sessionStorage.setItem(DEMO_SESSION_KEY, nom); } catch { /* stockage indisponible */ } setDemoNom(nom); };
+  const sortirDemo = () => { try { sessionStorage.removeItem(DEMO_SESSION_KEY); } catch { /* idem */ } setDemoNom(null); };
   const [version, setVersion] = useState(0);
   const [session, setSession] = useState(() => auth?.session() ?? null);
   useEffect(() => (auth ? auth.subscribe(() => setSession(auth.session())) : undefined), [auth]);
+
+  if (demoLogin && !auth && !demoNom) return <ConnexionDemoPage onConnecte={entrerDemo} />;
 
   if (auth && !session) {
     return (
@@ -48,6 +55,12 @@ export function App() {
           <NavLink to="/calendriers">Calendriers</NavLink>
           <NavLink to="/familles">Familles</NavLink>
         </nav>
+        {demoLogin && demoNom && (
+          <div className="compte">
+            <span className="sous">{demoNom}</span>
+            <button type="button" className="btn" onClick={sortirDemo}>Se déconnecter</button>
+          </div>
+        )}
         {auth && session && (
           <div className="compte">
             <span className="sous">{session.orgNom}</span>

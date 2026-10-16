@@ -8,6 +8,11 @@ export interface AppContextValue {
   today: () => string;
   /** Présent en mode API : connexion, espace de travail, déconnexion. */
   auth?: AuthClient;
+  /**
+   * Démonstration seulement : affiche un écran de connexion qui accepte n'importe quels identifiants (aucune donnée réelle,
+   * aucune API derrière). Jamais actif en mode API : l'authentification y est celle du serveur.
+   */
+  demoLogin?: boolean;
   /** Appelée après une réinitialisation des données de démonstration. */
   onReset?: () => void;
 }

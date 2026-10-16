@@ -223,3 +223,66 @@ describe('accessibilité des écrans de connexion (axe-core, jsdom)', () => {
       expect(r.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.html).join(' | ')}`)).toEqual([]);
     });
 });
+
+describe('connexion de démonstration (n\'importe quels identifiants)', () => {
+  beforeEach(() => { sessionStorage.clear(); localStorage.clear(); });
+  function monterDemo(auth?: AuthClient) {
+    const user = userEvent.setup();
+    const repo = new DemoRepository({ today: () => '2026-10-16' });
+    const utils = render(
+      <AppContext.Provider value={{ repo, today: () => '2026-10-16', demoLogin: true, ...(auth ? { auth } : {}) }}>
+        <MemoryRouter initialEntries={['/tickets']}><App /></MemoryRouter>
+      </AppContext.Provider>,
+    );
+    return { user, ...utils };
+  }
+
+  it('accepte un e-mail et un mot de passe quelconques et entre dans la console avec les données fictives', async () => {
+    const { user } = monterDemo();
+    expect(await screen.findByRole('heading', { name: 'Connexion à NOVA' })).toBeInTheDocument();
+    expect(screen.getByRole('note')).toHaveTextContent('N\'importe quel e-mail et mot de passe sont acceptés');
+    await user.type(screen.getByLabelText('Adresse e-mail'), 'quelquun@nimportequoi.test');
+    await user.type(screen.getByLabelText('Mot de passe'), 'x');
+    await user.click(screen.getByRole('button', { name: 'Se connecter' }));
+    expect(await screen.findByRole('navigation', { name: 'Navigation principale' })).toBeInTheDocument();
+    expect(screen.getByText('quelquun (démo)')).toBeInTheDocument();
+    expect(screen.getByText(/Mode démonstration\./)).toBeInTheDocument();
+  });
+
+  it('accepte même des champs vides', async () => {
+    const { user } = monterDemo();
+    await user.click(await screen.findByRole('button', { name: 'Se connecter' }));
+    expect(await screen.findByText('Administrateur (démo)')).toBeInTheDocument();
+  });
+
+  it('la session de démonstration survit à un rechargement de l\'onglet ; la déconnexion ramène à l\'écran de connexion', async () => {
+    const premier = monterDemo();
+    await premier.user.click(await screen.findByRole('button', { name: 'Se connecter' }));
+    await screen.findByRole('navigation', { name: 'Navigation principale' });
+    premier.unmount();
+    const second = monterDemo();
+    expect(await screen.findByRole('navigation', { name: 'Navigation principale' })).toBeInTheDocument();
+    await second.user.click(screen.getByRole('button', { name: 'Se déconnecter' }));
+    expect(await screen.findByRole('heading', { name: 'Connexion à NOVA' })).toBeInTheDocument();
+    expect(sessionStorage.getItem('nova.demo.session')).toBeNull();
+  });
+
+  it('GARDE-FOU : avec un client d\'authentification (mode API), jamais de connexion permissive', async () => {
+    const f = faux({ 'POST /auth/login': () => ({ status: 401, json: { error: 'invalid_credentials' } }) });
+    const { user } = monterDemo(new AuthClient('http://api.test', { fetchImpl: f.fetchImpl }));
+    expect(await screen.findByRole('heading', { name: 'Connexion à NOVA' })).toBeInTheDocument();
+    expect(screen.queryByRole('note')).toBeNull();
+    await user.type(screen.getByLabelText(/Adresse e-mail/), 'x@exemple.invalid');
+    await user.type(screen.getByLabelText(/Mot de passe/), 'nimporte quoi');
+    await user.click(screen.getByRole('button', { name: 'Se connecter' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Adresse e-mail ou mot de passe incorrect.');
+    expect(screen.queryByRole('navigation', { name: 'Navigation principale' })).toBeNull();
+  });
+
+  it('accessibilité de l\'écran (axe-core)', async () => {
+    const { container } = monterDemo();
+    await screen.findByRole('heading', { name: 'Connexion à NOVA' });
+    const r = await axe.run(container, { rules: { 'color-contrast': { enabled: false }, region: { enabled: false } } });
+    expect(r.violations.map((v) => v.id)).toEqual([]);
+  });
+});
