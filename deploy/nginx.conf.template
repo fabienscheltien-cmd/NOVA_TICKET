@@ -11,9 +11,11 @@ server {
   add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
   add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 
-  location = /healthz { access_log off; add_header Content-Type text/plain; return 200 "ok\n"; }
+  # Pas d'`add_header` dans les `location` : dès qu'un bloc en déclare un, nginx n'hérite plus de ceux du `server` et les
+  # en-têtes de sécurité disparaîtraient. Le cache passe par `expires`, qui n'a pas cet effet.
+  location = /healthz { access_log off; default_type text/plain; return 200 "ok\n"; }
 
   # Fichiers versionnés par Vite : cache long. L'index n'est jamais mis en cache.
-  location /assets/ { add_header Cache-Control "public, max-age=31536000, immutable" always; try_files $uri =404; }
-  location / { add_header Cache-Control "no-cache" always; try_files $uri /index.html; }
+  location /assets/ { expires 1y; try_files $uri =404; }
+  location / { expires -1; try_files $uri /index.html; }
 }
