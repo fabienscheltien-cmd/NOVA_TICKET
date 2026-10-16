@@ -11,6 +11,7 @@ export const MFA_SECRET = 'JBSWY3DPEHPK3PXP';
 export interface TestApp {
   app: INestApplication;
   base: string;
+  mailer: MemoryMailer;
   call(method: string, path: string, opts?: { body?: unknown; token?: string }): Promise<{ status: number; json: any }>;
   /** Connexion complète (MFA si le compte en a une) puis entrée dans l'espace de travail : renvoie le jeton d'accès de l'espace. */
   loginOrg(email: string, orgId: string): Promise<string>;
@@ -18,7 +19,8 @@ export interface TestApp {
 }
 
 export async function startTestApp(): Promise<TestApp> {
-  const mod = await Test.createTestingModule({ imports: [AppModule] }).overrideProvider(MAILER).useValue(new MemoryMailer()).compile();
+  const mailer = new MemoryMailer();
+  const mod = await Test.createTestingModule({ imports: [AppModule] }).overrideProvider(MAILER).useValue(mailer).compile();
   const app = mod.createNestApplication();
   configureApp(app);
   await app.listen(0, '127.0.0.1');
@@ -41,5 +43,5 @@ export async function startTestApp(): Promise<TestApp> {
     if (sw.status !== 200) throw new Error(`entrée dans l'espace refusée pour ${email} : ${JSON.stringify(sw.json)}`);
     return sw.json.access_token as string;
   };
-  return { app, base, call, loginOrg, close: () => app.close() };
+  return { app, base, mailer, call, loginOrg, close: () => app.close() };
 }

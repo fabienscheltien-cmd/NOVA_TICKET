@@ -16,7 +16,41 @@ describe('annuaire des prestataires', () => {
     expect(within(ligne(/Électro-Plus/)).getByText('Échue')).toBeInTheDocument();
     expect(within(ligne(/Aqua-Rapide/)).getByText('Échéance proche')).toBeInTheDocument();
     expect(within(ligne(/ClimaConfort/)).getByText('Suspendu')).toBeInTheDocument();
-    expect(within(ligne(/Thermi-Air/)).getByText('Non rattaché')).toBeInTheDocument();
+    expect(hydro.getByText('Compte rattaché')).toBeInTheDocument();
+    const thermi = within(ligne(/Thermi-Air/));
+    expect(thermi.getByText('Invitation en attente')).toBeInTheDocument();
+    expect(thermi.getByRole('button', { name: /Relancer Thermi-Air/ })).toBeInTheDocument();
+    expect(hydro.queryByRole('button', { name: /Inviter|Relancer/ })).toBeNull();
+  });
+
+  it('invite un prestataire sans compte : adresse validée, invitation en attente, aucun rattachement', async () => {
+    const { user, repo } = renderApp('/annuaire', demo((d) => { d.prestataires.find((p) => /Thermi/.test(p.nom))!.invitation_envoyee_le = null; }));
+    await screen.findAllByRole('row');
+    expect(within(ligne(/Thermi-Air/)).getByText('Pas de compte')).toBeInTheDocument();
+    await user.click(within(ligne(/Thermi-Air/)).getByRole('button', { name: /Inviter Thermi-Air/ }));
+    const fenetre = await screen.findByRole('dialog', { name: /Inviter Thermi-Air/ });
+    const champ = within(fenetre).getByLabelText(/Adresse e-mail de l'administrateur/);
+    await user.clear(champ);
+    await user.type(champ, 'pas-un-courriel');
+    await user.click(within(fenetre).getByRole('button', { name: 'Envoyer l\'invitation' }));
+    expect(within(fenetre).getByText('Adresse e-mail invalide.')).toBeInTheDocument();
+    await user.clear(champ);
+    await user.type(champ, 'Paul@Thermi-Air.test');
+    await user.click(within(fenetre).getByRole('button', { name: 'Envoyer l\'invitation' }));
+    expect(await screen.findByText('Invitation envoyée à paul@thermi-air.test.')).toBeInTheDocument();
+    expect(within(ligne(/Thermi-Air/)).getByText('Invitation en attente')).toBeInTheDocument();
+    const p = (await repo.listPrestataires()).find((x) => /Thermi/.test(x.nom))!;
+    expect(p.prestataire_org_id).toBeNull();
+  });
+
+  it('l\'invitation refusée par le serveur reste affichée dans la fenêtre', async () => {
+    const base = demo((d) => { d.prestataires.find((p) => /Thermi/.test(p.nom))!.invitation_envoyee_le = null; });
+    const { user } = renderApp('/annuaire', avecPannes(base, { inviterPrestataire: [new RepositoryError('conflict', 'Ce prestataire a déjà un compte rattaché')] }));
+    await screen.findAllByRole('row');
+    await user.click(within(ligne(/Thermi-Air/)).getByRole('button', { name: /Inviter Thermi-Air/ }));
+    const fenetre = await screen.findByRole('dialog');
+    await user.click(within(fenetre).getByRole('button', { name: 'Envoyer l\'invitation' }));
+    expect(await within(fenetre).findByRole('alert')).toHaveTextContent('déjà un compte rattaché');
   });
 
   it('filtre par famille, par statut et par recherche ; réinitialise les filtres', async () => {
@@ -58,7 +92,7 @@ describe('annuaire des prestataires', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     const cree = (await repo.listPrestataires({ q: 'Plombiers' }))[0]!;
     expect(cree.familles).toEqual([{ famille_id: (await repo.listFamilles()).find((f) => f.code === 'plomberie')!.id, priorite: 3 }]);
-    expect(within(await screen.findByRole('row', { name: /Plombiers Associés/ })).getByText('Non rattaché')).toBeInTheDocument();
+    expect(within(await screen.findByRole('row', { name: /Plombiers Associés/ })).getByText('Pas de compte')).toBeInTheDocument();
   });
 
   it('modifie les familles d\'un prestataire existant', async () => {

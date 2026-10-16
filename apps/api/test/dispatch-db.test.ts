@@ -24,9 +24,10 @@ describe('annuaire, familles, éligibilité et affectation — base de données'
     fPlomb = (await q<{ id: string }>(as(ID.PM1), "INSERT INTO famille_ticket (org_id, code, libelle) VALUES ($1, 'plomberie', 'Plomberie') RETURNING id", [ID.PM1]))[0]!.id;
     fElec = (await q<{ id: string }>(as(ID.PM1), "INSERT INTO famille_ticket (org_id, code, libelle) VALUES ($1, 'electricite', 'Électricité') RETURNING id", [ID.PM1]))[0]!.id;
     const ann = async (nom: string, org: string | null, o: { statut?: string; assurance?: string } = {}) =>
-      (await q<{ id: string }>(as(ID.PM1),
+      // Rattachement par le back-office (propriétaire) : nova_app n'a pas le droit d'écrire prestataire_org_id (voir 0005).
+      (await sql(
         'INSERT INTO prestataire_annuaire (org_id, nom, prestataire_org_id, statut, assurance_expire_le) VALUES ($1,$2,$3,$4,$5) RETURNING id',
-        [ID.PM1, nom, org, o.statut ?? 'actif', o.assurance ?? '2099-01-01']))[0]!.id;
+        [ID.PM1, nom, org, o.statut ?? 'actif', o.assurance ?? '2099-01-01']))[0]!.id as string;
     aHydro = await ann('Hydro', ID.P1);
     aAqua = await ann('Aqua', ID.P2);
     aSusp = await ann('Suspendu', ID.P3, { statut: 'suspendu' });
@@ -58,9 +59,15 @@ describe('annuaire, familles, éligibilité et affectation — base de données'
   });
 
   it('3. le compte rattaché doit être un prestataire actif, distinct de l\'organisation, et unique dans l\'annuaire', async () => {
-    await assert.rejects(q(as(ID.PM1), "INSERT INTO prestataire_annuaire (org_id, nom, prestataire_org_id) VALUES ($1, 'Faux', $2)", [ID.PM1, ID.B2]), /prestataire actif/);
-    await assert.rejects(q(as(ID.PM1), "INSERT INTO prestataire_annuaire (org_id, nom, prestataire_org_id) VALUES ($1, 'Doublon', $2)", [ID.PM1, ID.P1]), /unique|duplicate/);
+    await assert.rejects(sql("INSERT INTO prestataire_annuaire (org_id, nom, prestataire_org_id) VALUES ($1, 'Faux', $2)", [ID.PM1, ID.B2]), /prestataire actif/);
+    await assert.rejects(sql("INSERT INTO prestataire_annuaire (org_id, nom, prestataire_org_id) VALUES ($1, 'Doublon', $2)", [ID.PM1, ID.P1]), /unique|duplicate/);
     await assert.rejects(sql('UPDATE prestataire_annuaire SET org_id = $1 WHERE id = $2', [ID.PM2, aHydro]), /ne peut pas être modifié/);
+  });
+
+  it('3 bis. nova_app ne peut écrire prestataire_org_id ni à la création ni à la modification (rattachement par invitation seulement)', async () => {
+    await assert.rejects(q(as(ID.PM1), "INSERT INTO prestataire_annuaire (org_id, nom, prestataire_org_id) VALUES ($1, 'Force', $2)", [ID.PM1, ID.P2]), /permission denied/);
+    await assert.rejects(q(as(ID.PM1), 'UPDATE prestataire_annuaire SET prestataire_org_id = $1 WHERE id = $2', [ID.P2, aOrphelin]), /permission denied/);
+    assert.equal((await sql('SELECT prestataire_org_id FROM prestataire_annuaire WHERE id = $1', [aOrphelin]))[0]!.prestataire_org_id, null);
   });
 
   it('4. éligibilité : famille du ticket, motifs d\'exclusion, tri par priorité, visible du seul dispatcheur', async () => {

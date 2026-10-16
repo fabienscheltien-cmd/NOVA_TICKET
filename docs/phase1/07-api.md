@@ -53,6 +53,9 @@
 | POST | `/annuaire/{id}/statut` (`actif` / `suspendu`) | `config.manage` |
 | POST | `/tickets` (`titre`, `famille_id`, `site_id`, `local_id?`, `priorite?`) : renvoie le détail avec la sélection des éligibles | `ticket.create` |
 | GET | `/tickets` · `/tickets/{id}` (détail : historique des affectations, `selection.eligibles`, `selection.suggere`) | `ticket.read` |
+| POST | `/annuaire/{id}/invitation` (`email`) : invite le prestataire à créer son compte ; 200 + fiche, 404, 409 `deja_rattache`, 400 | `config.manage` |
+| GET | `/organisation/membres` · `/organisation/invitations` : tout le compte de l'administrateur | `user.manage` |
+| POST | `/invitations/{id}/revoke` : 204, 404 si inconnue ou déjà traitée | `user.invite` |
 | POST | `/tickets/{id}/affectation` (`annuaire_id`, `motif?`) : 200, 404, 409 `deja_affecte` / `statut_incompatible`, 422 `non_eligible` + `raison` | `ticket.assign` |
 
 ## Fils, pièces jointes

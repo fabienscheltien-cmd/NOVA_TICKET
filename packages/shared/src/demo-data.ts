@@ -8,6 +8,7 @@ export interface FamilleRow { id: string; code: string; libelle: string; actif: 
 export interface PrestataireRow {
   id: string; nom: string; contact_nom: string | null; contact_email: string | null; contact_telephone: string | null;
   zone: string | null; statut: StatutPrestataire; assurance_expire_le: string | null; prestataire_org_id: string | null;
+  invitation_email: string | null; invitation_envoyee_le: string | null;
   notes: string | null; familles: Array<{ famille_id: string; priorite: number }>; created_at: string;
 }
 export interface SiteRow { id: string; nom: string }
@@ -40,7 +41,7 @@ export function creerDonneesDemo(aujourdhui: string): DemoData {
   const horodatage = `${jour(aujourdhui, -90)}T09:00:00.000Z`;
   const p = (n: number, nom: string, o: Partial<PrestataireRow> & { familles: PrestataireRow['familles'] }): PrestataireRow => ({
     id: uuid(200 + n), nom, contact_nom: null, contact_email: null, contact_telephone: null, zone: null, statut: 'actif',
-    assurance_expire_le: jour(aujourdhui, 200), prestataire_org_id: uuid(900 + n), notes: null, created_at: horodatage, ...o,
+    assurance_expire_le: jour(aujourdhui, 200), prestataire_org_id: uuid(900 + n), invitation_email: null, invitation_envoyee_le: null, notes: null, created_at: horodatage, ...o,
   });
   const prestataires: PrestataireRow[] = [
     p(1, 'Hydro-Services (démo)', { contact_nom: 'Camille Martin', contact_email: 'contact@hydro-services.demo.invalid', contact_telephone: '01 00 00 00 01', zone: 'Lyon et agglomération',
@@ -54,7 +55,7 @@ export function creerDonneesDemo(aujourdhui: string): DemoData {
     p(5, 'ClimaConfort (démo)', { contact_nom: 'Nadia Lopes', contact_email: 'contact@climaconfort.demo.invalid', contact_telephone: '01 00 00 00 05', zone: 'Lyon',
       statut: 'suspendu', notes: 'Suspendu : litige en cours.', familles: [{ famille_id: fam('cvc'), priorite: 1 }] }),
     p(6, 'Thermi-Air (démo)', { contact_nom: 'Paul Girard', contact_email: 'contact@thermi-air.demo.invalid', contact_telephone: '01 00 00 00 06', zone: 'Lyon',
-      prestataire_org_id: null, notes: 'Invitation à créer un compte NOVA envoyée.', familles: [{ famille_id: fam('cvc'), priorite: 3 }] }),
+      prestataire_org_id: null, invitation_email: 'contact@thermi-air.demo.invalid', invitation_envoyee_le: `${jour(aujourdhui, -3)}T10:00:00.000Z`, notes: null, familles: [{ famille_id: fam('cvc'), priorite: 3 }] }),
     p(7, 'Clés & Sécurité (démo)', { contact_nom: 'Élodie Fabre', contact_email: 'contact@cles-securite.demo.invalid', contact_telephone: '01 00 00 00 07', zone: 'Lyon',
       familles: [{ famille_id: fam('serrurerie'), priorite: 1 }, { famille_id: fam('controle_acces'), priorite: 2 }] }),
     p(8, 'Serrures Express (démo)', { contact_nom: 'Karim Haddad', contact_email: 'contact@serrures-express.demo.invalid', contact_telephone: '01 00 00 00 08', zone: 'Lyon 24 h/24',

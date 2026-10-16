@@ -37,6 +37,11 @@ export interface Repository {
   /** Si `familles` est fourni, il REMPLACE l'ensemble des référencements. */
   updatePrestataire(id: string, patch: PrestatairePatch): Promise<Prestataire>;
   setStatutPrestataire(id: string, statut: StatutPrestataire): Promise<Prestataire>;
+  /**
+   * Invite le prestataire à créer son compte NOVA (e-mail simulé tant que le prestataire d'envoi n'est pas choisi).
+   * Le rattachement (`prestataire_org_id`) n'est posé qu'à l'acceptation, jamais ici. Refusé si déjà rattaché.
+   */
+  inviterPrestataire(id: string, email: string): Promise<Prestataire>;
 
   listSites(): Promise<Site[]>;
   listLocaux(siteId: string): Promise<Local[]>;

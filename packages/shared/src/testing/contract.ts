@@ -14,6 +14,11 @@ export interface ContractHarness {
     /** Au moins cinq identifiants de comptes prestataires distincts (rattachement). */
     orgIds: string[];
   };
+  /**
+   * Simule l'acceptation d'une invitation : rattache la fiche à un compte prestataire. Aucune API ne permet de
+   * rattacher un compte sans son consentement, donc la suite passe par ce crochet (SQL côté API, méthode de démonstration).
+   */
+  rattacher: (annuaireId: string, orgId: string) => Promise<void>;
 }
 
 const jour = (delta: number): string => {
@@ -71,8 +76,12 @@ export function runRepositoryContract(nom: string, preparer: () => Promise<Contr
 
     it('annuaire : création avec référencements, filtres, validation, unicité du compte rattaché', async () => {
       const { repo, fixtures } = h;
-      const mk = (cle: string, nom: string, o: Record<string, unknown>) =>
-        repo.createPrestataire({ nom: `${nom} ${s}`, contact_nom: 'Contact', contact_email: `${cle}@exemple.invalid`, ...o } as never).then((r) => { p[cle] = r; });
+      const mk = async (cle: string, nom: string, o: Record<string, unknown>) => {
+        const { prestataire_org_id: org, ...champs } = o;
+        const cree = await repo.createPrestataire({ nom: `${nom} ${s}`, contact_nom: 'Contact', contact_email: `${cle}@exemple.invalid`, ...champs } as never);
+        if (org) await h.rattacher(cree.id, org as string);
+        p[cle] = await repo.getPrestataire(cree.id);
+      };
       await mk('b', 'Bravo', { prestataire_org_id: fixtures.orgIds[0], assurance_expire_le: jour(100), familles: [{ famille_id: f1.id, priorite: 2 }] });
       await mk('a', 'Alpha', { prestataire_org_id: fixtures.orgIds[1], assurance_expire_le: jour(100), familles: [{ famille_id: f1.id, priorite: 1 }, { famille_id: f2.id, priorite: 3 }] });
       await mk('c', 'Charlie', { prestataire_org_id: fixtures.orgIds[2], assurance_expire_le: jour(-2), familles: [{ famille_id: f1.id, priorite: 1 }] });
@@ -95,8 +104,23 @@ export function runRepositoryContract(nom: string, preparer: () => Promise<Contr
       await refus(repo.createPrestataire({ nom: `X ${s}`, familles: [{ famille_id: f1.id, priorite: 0 }] }), 'validation');
       await refus(repo.createPrestataire({ nom: `X ${s}`, familles: [{ famille_id: f1.id, priorite: 1 }, { famille_id: f1.id, priorite: 2 }] }), 'validation');
       await refus(repo.createPrestataire({ nom: `X ${s}`, familles: [{ famille_id: '00000000-0000-4000-8000-0000000000ee', priorite: 1 }] }), 'validation');
-      await refus(repo.createPrestataire({ nom: `Doublon ${s}`, prestataire_org_id: fixtures.orgIds[0], familles: [] }), 'conflict');
+      const forge = await repo.createPrestataire({ nom: `Forgé ${s}`, prestataire_org_id: fixtures.orgIds[0], familles: [] } as never);
+      assert.equal(forge.prestataire_org_id, null, 'un compte ne se rattache pas par identifiant : seule l\'invitation le permet');
       await refus(repo.getPrestataire('00000000-0000-4000-8000-0000000000dd'), 'not_found');
+    });
+
+    it('invitation d\'un prestataire : e-mail valide exigé, refus si déjà rattaché ou inconnu, ré-invitation possible, aucun rattachement avant acceptation', async () => {
+      const { repo } = h;
+      assert.equal(p.e!.invitation_email, null);
+      await refus(repo.inviterPrestataire(p.e!.id, 'pas-un-courriel'), 'validation');
+      const invite = await repo.inviterPrestataire(p.e!.id, `Echo.${s}@Exemple.invalid`);
+      assert.equal(invite.invitation_email, `echo.${s}@exemple.invalid`, 'adresse normalisée');
+      assert.ok(invite.invitation_envoyee_le);
+      assert.equal(invite.prestataire_org_id, null, 'pas de rattachement tant que le prestataire n\'a pas accepté');
+      const encore = await repo.inviterPrestataire(p.e!.id, `echo2.${s}@exemple.invalid`);
+      assert.equal(encore.invitation_email, `echo2.${s}@exemple.invalid`);
+      await refus(repo.inviterPrestataire(p.a!.id, 'a@exemple.invalid'), 'conflict');
+      await refus(repo.inviterPrestataire('00000000-0000-4000-8000-0000000000dd', 'a@exemple.invalid'), 'not_found');
     });
 
     it('annuaire : modification (les référencements sont remplacés seulement s\'ils sont fournis), suspension et réactivation', async () => {

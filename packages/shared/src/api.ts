@@ -66,6 +66,7 @@ export class ApiRepository implements Repository {
   getPrestataire(id: string) { return this.call<Prestataire>('GET', `/annuaire/${id}`); }
   createPrestataire(input: PrestataireInput) { return this.call<Prestataire>('POST', '/annuaire', input); }
   updatePrestataire(id: string, patch: PrestatairePatch) { return this.call<Prestataire>('PATCH', `/annuaire/${id}`, patch); }
+  inviterPrestataire(id: string, email: string) { return this.call<Prestataire>('POST', `/annuaire/${id}/invitation`, { email }); }
   setStatutPrestataire(id: string, statut: StatutPrestataire) { return this.call<Prestataire>('POST', `/annuaire/${id}/statut`, { statut }); }
 
   async listSites(): Promise<Site[]> {

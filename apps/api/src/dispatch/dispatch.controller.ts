@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, Inject, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
 import { statutPrestataireSchema } from '@nova/shared';
+import { AuthService } from '../auth/auth.service.js';
 import { AuthError } from '../auth/errors.js';
 import { type AuthedRequest, OrgGuard, RequirePermission } from '../auth/guards.js';
 import { pageSchema } from '../patrimoine/schemas.js';
@@ -17,7 +18,10 @@ const idParam = (v: string) => parse(uuid, v);
 @Controller()
 @UseGuards(OrgGuard)
 export class DispatchController {
-  constructor(@Inject(DispatchService) private readonly d: DispatchService) {}
+  constructor(
+    @Inject(DispatchService) private readonly d: DispatchService,
+    @Inject(AuthService) private readonly auth: AuthService,
+  ) {}
 
   // Familles de tickets
   @Get('familles') @RequirePermission('annuaire.read')
@@ -44,6 +48,14 @@ export class DispatchController {
   @Post('annuaire/:id/statut') @HttpCode(200) @RequirePermission('config.manage')
   statut(@Req() r: AuthedRequest, @Param('id') id: string, @Body() b: unknown) {
     return this.d.setStatutPrestataire(r.tenant!, idParam(id), parse(statutPrestataireSchema, b).statut);
+  }
+
+  /** Invite le prestataire à créer son compte ; le rattachement n'est posé qu'à l'acceptation. */
+  @Post('annuaire/:id/invitation') @HttpCode(200) @RequirePermission('config.manage')
+  async inviter(@Req() r: AuthedRequest, @Param('id') id: string, @Body() b: unknown) {
+    const { email } = parse(z.object({ email: z.string().trim().email().max(254) }), b);
+    await this.auth.inviterPrestataire(r.tenant!, idParam(id), email);
+    return this.d.getPrestataire(r.tenant!, id);
   }
 
   // Tickets et affectation

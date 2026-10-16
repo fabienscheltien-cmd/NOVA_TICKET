@@ -31,7 +31,8 @@ Tickets, annuaire, familles, détail avec affectation. Deux sources de données 
 
 ## Limites connues
 - Un ticket est dispatché par l'organisation qui l'a créé : sa famille est issue de son catalogue ; un autre acteur (par ex. le bailleur) n'a pas de candidats à moins d'avoir son propre annuaire référençant la même famille.
-- Le rattachement d'un prestataire à son compte se fait par l'identifiant d'organisation, communiqué hors plateforme (pas d'annuaire inter-organisations ni d'invitation de prestataire).
+- **Compte prestataire par invitation (D38).** Depuis la fiche, le PM invite une adresse e-mail (e-mail simulé, D20). L'acceptation crée l'organisation prestataire, dont l'invité est l'administrateur (MFA obligatoire à sa première entrée), et rattache la fiche. Une nouvelle invitation révoque la précédente et réutilise l'organisation en attente. `nova_app` ne peut plus écrire `prestataire_org_id` (droit de colonne) : un PM ne peut pas rattacher une organisation sans son accord. Reste : l'organisation en attente existe sans membre dès l'invitation (nettoyage à prévoir si jamais acceptée) ; un prestataire invité par deux clients aura deux organisations distinctes tant qu'on n'a pas de fusion de comptes.
+- **Bailleur en lecture seule (D37)** : il voit tickets et sites mais n'affecte pas ; le PM qu'il mandate dispatche.
 - Pas encore pris en compte : contrat de service actif et périmètre par site, calendriers et astreintes, SLA en risque, documents de conformité autres que l'assurance. Ce sont les prochains critères d'éligibilité (la règle est centralisée pour les accueillir).
 - Un prestataire ne voit pas le site ni le local du ticket confié tant que les contrats de service n'existent pas.
 - La console n'a pas d'écran de connexion : en mode API, le jeton est collé à la main.

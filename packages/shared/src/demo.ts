@@ -7,7 +7,7 @@ import {
   affectationInputSchema, familleCreateSchema, famillePatchSchema, prestataireInputSchema, prestatairePatchSchema, ticketCreateSchema,
 } from './schemas.js';
 import type { Affectation, Famille, Local, Prestataire, Site, StatutPrestataire, Ticket, TicketDetail } from './types.js';
-import type { z } from 'zod';
+import { z } from 'zod';
 
 export interface DemoOptions {
   seed?: DemoData;
@@ -108,10 +108,13 @@ export class DemoRepository implements Repository {
       if (!this.data.familles.some((f) => f.id === r.famille_id)) throw new RepositoryError('validation', 'familles : famille inconnue');
     }
   }
-  private verifierOrg(orgId: string | null, sauf?: string): void {
-    if (orgId && this.data.prestataires.some((p) => p.prestataire_org_id === orgId && p.id !== sauf)) {
+  /** Démonstration uniquement : simule l'acceptation de l'invitation par le prestataire. */
+  simulerAcceptation(id: string, orgId: string = this.newId()): void {
+    const row = this.prestataire(id);
+    if (this.data.prestataires.some((p) => p.prestataire_org_id === orgId && p.id !== id)) {
       throw new RepositoryError('conflict', 'Ce compte prestataire est déjà dans l\'annuaire');
     }
+    row.prestataire_org_id = orgId;
   }
 
   async listPrestataires(filters: PrestataireFilters = {}): Promise<Prestataire[]> {
@@ -132,8 +135,9 @@ export class DemoRepository implements Repository {
     await this.tick();
     const i = parse(prestataireInputSchema, input);
     this.verifierFamilles(i.familles);
-    this.verifierOrg(i.prestataire_org_id);
-    const row: PrestataireRow = { id: this.newId(), ...i, created_at: this.now().toISOString() };
+    const row: PrestataireRow = {
+      id: this.newId(), ...i, prestataire_org_id: null, invitation_email: null, invitation_envoyee_le: null, created_at: this.now().toISOString(),
+    };
     this.data.prestataires.push(row);
     return this.prestataireVue(row);
   }
@@ -145,8 +149,16 @@ export class DemoRepository implements Repository {
     const p = Object.fromEntries(Object.entries(raw).filter(([k]) => given[k] !== undefined)) as Partial<PrestataireRow>;
     const row = this.prestataire(id);
     if (p.familles) this.verifierFamilles(p.familles);
-    if (p.prestataire_org_id !== undefined) this.verifierOrg(p.prestataire_org_id, id);
     Object.assign(row, p);
+    return this.prestataireVue(row);
+  }
+  async inviterPrestataire(id: string, email: string): Promise<Prestataire> {
+    await this.tick();
+    const e = parse(z.string().trim().email('adresse invalide').max(254), email).toLowerCase();
+    const row = this.prestataire(id);
+    if (row.prestataire_org_id) throw new RepositoryError('conflict', 'Ce prestataire a déjà un compte rattaché');
+    row.invitation_email = e;
+    row.invitation_envoyee_le = this.now().toISOString();
     return this.prestataireVue(row);
   }
   async setStatutPrestataire(id: string, statut: StatutPrestataire): Promise<Prestataire> {

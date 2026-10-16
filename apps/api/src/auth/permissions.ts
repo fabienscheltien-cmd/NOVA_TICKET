@@ -42,6 +42,17 @@ export const PERMISSIONS: Record<string, Partial<Record<Role, Grant>>> = {
   'support.access': { support: C },
 };
 
-export function grantFor(role: string, permission: string): Grant | null {
+/**
+ * Le bailleur a une VISION (décision du porteur, 16/10/2026) : il ne crée, ne qualifie, n'affecte ni ne
+ * configure rien dans le dispatch, quel que soit son rôle. Le PM qu'il mandate agit.
+ */
+const BAILLEUR_LECTURE_SEULE = new Set([
+  'ticket.create', 'ticket.qualify', 'ticket.assign', 'ticket.transition', 'ticket.close', 'ticket.merge_link',
+  'ticket.comment_shared', 'ticket.comment_internal', 'ticket.satisfaction_record',
+  'ot.create', 'ot.accept', 'ot.execute', 'ot.validate', 'ot.subcontract', 'config.manage',
+]);
+
+export function grantFor(role: string, permission: string, orgType?: string): Grant | null {
+  if (orgType === 'bailleur' && BAILLEUR_LECTURE_SEULE.has(permission)) return null;
   return PERMISSIONS[permission]?.[role as Role] ?? null;
 }

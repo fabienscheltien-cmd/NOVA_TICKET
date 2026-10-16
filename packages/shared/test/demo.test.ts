@@ -15,6 +15,7 @@ runRepositoryContract('DemoRepository', () => {
       siteId: uuid(300), localId: uuid(400), localAutreSiteId: uuid(403),
       orgIds: [uuid(801), uuid(802), uuid(803), uuid(804), uuid(805)],
     },
+    rattacher: async (id, orgId) => repo.simulerAcceptation(id, orgId),
   };
 });
 

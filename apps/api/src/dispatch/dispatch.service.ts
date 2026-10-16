@@ -21,7 +21,7 @@ const FAMILLE_SQL = `
 const PRESTATAIRE_SQL = `
   SELECT a.id, a.nom, a.contact_nom, a.contact_email, a.contact_telephone, a.zone, a.statut,
          to_char(a.assurance_expire_le, 'YYYY-MM-DD') AS assurance_expire_le,
-         a.prestataire_org_id, a.notes, a.created_at,
+         a.prestataire_org_id, a.invitation_email, a.invitation_envoyee_le, a.notes, a.created_at,
          COALESCE((SELECT json_agg(json_build_object('famille_id', pf.famille_id, 'priorite', pf.priorite) ORDER BY pf.priorite, pf.famille_id)
                      FROM prestataire_famille pf WHERE pf.annuaire_id = a.id), '[]'::json) AS familles
     FROM prestataire_annuaire a`;

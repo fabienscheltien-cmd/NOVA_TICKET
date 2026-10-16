@@ -42,7 +42,12 @@ async function preparer() {
   tokens.p1 = await t.loginOrg('tech.p6@test.invalid', P6);
   tokens.p2 = await t.loginOrg('tech.p7@test.invalid', P7);
   const repo: Repository = new ApiRepository({ baseUrl: t.base, getToken: () => tokens.pm1! });
-  return { repo, fixtures: { siteId: ID.siteB1a, localId: localA, localAutreSiteId: localB, orgIds: [ID.P1, ID.P2, ID.P3, ID.S1, P4] } };
+  return {
+    repo,
+    fixtures: { siteId: ID.siteB1a, localId: localA, localAutreSiteId: localB, orgIds: [ID.P1, ID.P2, ID.P3, ID.S1, P4] },
+    // Back-office (connexion propriétaire) : l'API elle-même interdit le rattachement par identifiant.
+    rattacher: async (annuaireId, orgId) => { await admin.query('UPDATE prestataire_annuaire SET prestataire_org_id = $1 WHERE id = $2', [orgId, annuaireId]); },
+  };
 }
 
 // La même suite que pour la démonstration, contre l'API réelle et PostgreSQL : la console peut passer de l'une à l'autre.
@@ -55,8 +60,10 @@ describe('API — permissions, isolation et affectation de bout en bout', () => 
   before(async () => {
     const repo = as('pm1');
     famille = (await repo.createFamille({ libelle: 'Isolation e2e' })).id;
-    hydro = (await repo.createPrestataire({ nom: 'Hydro e2e', prestataire_org_id: P6, familles: [{ famille_id: famille, priorite: 1 }] })).id;
-    aqua = (await repo.createPrestataire({ nom: 'Aqua e2e', prestataire_org_id: P7, familles: [{ famille_id: famille, priorite: 2 }] })).id;
+    hydro = (await repo.createPrestataire({ nom: 'Hydro e2e', familles: [{ famille_id: famille, priorite: 1 }] })).id;
+    aqua = (await repo.createPrestataire({ nom: 'Aqua e2e', familles: [{ famille_id: famille, priorite: 2 }] })).id;
+    await admin.query('UPDATE prestataire_annuaire SET prestataire_org_id = $1 WHERE id = $2', [P6, hydro]);
+    await admin.query('UPDATE prestataire_annuaire SET prestataire_org_id = $1 WHERE id = $2', [P7, aqua]);
     ticket = (await repo.createTicket({ titre: 'Fuite e2e', famille_id: famille, site_id: ID.siteB1a })).id;
   });
   after(async () => { await t.close(); await admin.end(); });
@@ -118,7 +125,7 @@ describe('API — permissions, isolation et affectation de bout en bout', () => 
     assert.equal(b1.json.famille_libelle, 'Isolation e2e');
     assert.equal(b1.json.prestataire_actuel, null, 'le bailleur ne voit pas l\'annuaire ni les affectations de son PM');
     const refus = await t.call('POST', `/tickets/${ticket}/affectation`, { token: tokens.b1, body: { annuaire_id: aqua } });
-    assert.equal(refus.status, 422);
+    assert.equal(refus.status, 403, 'le bailleur a une vision : il n\'affecte pas, même avec un annuaire (décision 16/10/2026)');
   });
 
   it('familles standard : import idempotent par organisation, isolé entre organisations', async () => {

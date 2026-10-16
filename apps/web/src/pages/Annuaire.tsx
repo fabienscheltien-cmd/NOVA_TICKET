@@ -25,6 +25,7 @@ export function AnnuairePage() {
   const familleId = params.get('famille') ?? '';
   const statut = (params.get('statut') ?? '') as StatutPrestataire | '';
   const [edition, setEdition] = useState<Prestataire | 'nouveau' | null>(null);
+  const [invitation, setInvitation] = useState<Prestataire | null>(null);
   const [message, setMessage] = useState('');
   const [erreurAction, setErreurAction] = useState('');
 
@@ -136,10 +137,15 @@ export function AnnuairePage() {
                     )}
                   </td>
                   <td><BadgeAssurance expire={p.assurance_expire_le} /></td>
-                  <td>{p.prestataire_org_id ? <Badge ton="ok">Rattaché</Badge> : <Badge ton="alerte" title="Aucune affectation possible tant que le prestataire n'a pas de compte">Non rattaché</Badge>}</td>
+                  <td><CompteNova p={p} /></td>
                   <td><Badge ton={p.statut === 'actif' ? 'ok' : 'danger'}>{STATUTS_PRESTATAIRE[p.statut]}</Badge></td>
                   <td><div className="actions">
                     <button type="button" className="btn" onClick={() => setEdition(p)} aria-label={`Modifier ${p.nom}`}>Modifier</button>
+                    {!p.prestataire_org_id && (
+                      <button type="button" className="btn" onClick={() => setInvitation(p)} aria-label={`${p.invitation_envoyee_le ? 'Relancer' : 'Inviter'} ${p.nom}`}>
+                        {p.invitation_envoyee_le ? 'Relancer' : 'Inviter'}
+                      </button>
+                    )}
                     <button type="button" className="btn" onClick={() => void basculer(p)} aria-label={`${p.statut === 'actif' ? 'Suspendre' : 'Réactiver'} ${p.nom}`}>
                       {p.statut === 'actif' ? 'Suspendre' : 'Réactiver'}
                     </button>
@@ -159,13 +165,70 @@ export function AnnuairePage() {
           onSaved={(p, creation) => { setEdition(null); setMessage(creation ? `${p.nom} a été ajouté à l'annuaire.` : `${p.nom} a été mis à jour.`); recharger(); }}
         />
       )}
+      {invitation && (
+        <InvitationModal
+          prestataire={invitation}
+          onClose={() => setInvitation(null)}
+          onSent={(email) => { setInvitation(null); setMessage(`Invitation envoyée à ${email}.`); recharger(); }}
+        />
+      )}
     </section>
+  );
+}
+
+function CompteNova({ p }: { p: Prestataire }) {
+  if (p.prestataire_org_id) return <Badge ton="ok">Compte rattaché</Badge>;
+  if (p.invitation_envoyee_le) {
+    return (
+      <span className="assurance">
+        <Badge ton="info" title="Le rattachement n'a lieu que lorsque le prestataire accepte l'invitation">Invitation en attente</Badge>
+        <span className="sous">{p.invitation_email} · {dateCivile(p.invitation_envoyee_le.slice(0, 10))}</span>
+      </span>
+    );
+  }
+  return <Badge ton="alerte" title="Aucune affectation possible tant que le prestataire n'a pas de compte">Pas de compte</Badge>;
+}
+
+function InvitationModal({ prestataire, onClose, onSent }: { prestataire: Prestataire; onClose: () => void; onSent: (email: string) => void }) {
+  const { repo } = useApp();
+  const [email, setEmail] = useState(prestataire.invitation_email ?? prestataire.contact_email ?? '');
+  const [erreur, setErreur] = useState('');
+  const [erreurServeur, setErreurServeur] = useState('');
+  const [envoi, setEnvoi] = useState(false);
+
+  async function envoyer(e: FormEvent) {
+    e.preventDefault();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setErreur('Adresse e-mail invalide.'); return; }
+    setErreur(''); setErreurServeur(''); setEnvoi(true);
+    try {
+      const p = await repo.inviterPrestataire(prestataire.id, email.trim());
+      onSent(p.invitation_email ?? email.trim());
+    } catch (ex) { setErreurServeur(messageErreur(ex)); setEnvoi(false); }
+  }
+
+  return (
+    <Modal titre={`Inviter ${prestataire.nom}`} onClose={onClose}>
+      <form onSubmit={(e) => void envoyer(e)} noValidate>
+        <p className="help">
+          Le prestataire reçoit un lien pour créer son compte NOVA. Il n'est rattaché à votre annuaire, et donc affectable,
+          qu'une fois l'invitation acceptée. Une nouvelle invitation annule la précédente.
+        </p>
+        <Field label="Adresse e-mail de l'administrateur du prestataire" required error={erreur}>
+          {(p) => <input {...p} type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="off" />}
+        </Field>
+        {erreurServeur && <p className="alert" role="alert">{erreurServeur}</p>}
+        <footer className="modal-foot">
+          <button type="button" className="btn" onClick={onClose}>Annuler</button>
+          <button type="submit" className="btn btn-primary" disabled={envoi}>{envoi ? 'Envoi…' : 'Envoyer l\'invitation'}</button>
+        </footer>
+      </form>
+    </Modal>
   );
 }
 
 interface FormState {
   nom: string; contact_nom: string; contact_email: string; contact_telephone: string; zone: string; assurance_expire_le: string;
-  statut: StatutPrestataire; prestataire_org_id: string; notes: string; familles: Record<string, string>;
+  statut: StatutPrestataire; notes: string; familles: Record<string, string>;
 }
 
 function PrestataireModal({ prestataire, familles, onClose, onSaved }: {
@@ -175,10 +238,10 @@ function PrestataireModal({ prestataire, familles, onClose, onSaved }: {
   const [f, setF] = useState<FormState>(() => ({
     nom: prestataire?.nom ?? '', contact_nom: prestataire?.contact_nom ?? '', contact_email: prestataire?.contact_email ?? '',
     contact_telephone: prestataire?.contact_telephone ?? '', zone: prestataire?.zone ?? '', assurance_expire_le: prestataire?.assurance_expire_le ?? '',
-    statut: prestataire?.statut ?? 'actif', prestataire_org_id: prestataire?.prestataire_org_id ?? '', notes: prestataire?.notes ?? '',
+    statut: prestataire?.statut ?? 'actif', notes: prestataire?.notes ?? '',
     familles: Object.fromEntries((prestataire?.familles ?? []).map((r) => [r.famille_id, String(r.priorite)])),
   }));
-  const [erreurs, setErreurs] = useState<Partial<Record<'nom' | 'email' | 'org', string>>>({});
+  const [erreurs, setErreurs] = useState<Partial<Record<'nom' | 'email', string>>>({});
   const [erreurServeur, setErreurServeur] = useState('');
   const [envoi, setEnvoi] = useState(false);
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setF((s) => ({ ...s, [k]: v }));
@@ -189,14 +252,13 @@ function PrestataireModal({ prestataire, familles, onClose, onSaved }: {
     const err: typeof erreurs = {};
     if (!f.nom.trim()) err.nom = 'Le nom est obligatoire.';
     if (f.contact_email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.contact_email.trim())) err.email = 'Adresse e-mail invalide.';
-    if (f.prestataire_org_id.trim() && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(f.prestataire_org_id.trim())) err.org = 'Identifiant invalide (format UUID).';
     setErreurs(err);
     if (Object.keys(err).length) return;
     const refs = Object.entries(f.familles).map(([famille_id, p]) => ({ famille_id, priorite: Math.max(1, Math.min(99, Number.parseInt(p, 10) || 1)) }));
     const donnees = {
       nom: f.nom.trim(), contact_nom: f.contact_nom.trim() || null, contact_email: f.contact_email.trim() || null,
       contact_telephone: f.contact_telephone.trim() || null, zone: f.zone.trim() || null, assurance_expire_le: f.assurance_expire_le || null,
-      statut: f.statut, prestataire_org_id: f.prestataire_org_id.trim() || null, notes: f.notes.trim() || null, familles: refs,
+      statut: f.statut, notes: f.notes.trim() || null, familles: refs,
     };
     setEnvoi(true); setErreurServeur('');
     try {
@@ -233,9 +295,6 @@ function PrestataireModal({ prestataire, familles, onClose, onSaved }: {
                 <option value="actif">Actif</option><option value="suspendu">Suspendu</option>
               </select>
             )}
-          </Field>
-          <Field label="Identifiant du compte NOVA" error={erreurs.org} help="Facultatif. Fourni par le prestataire une fois son compte créé ; sans lui, aucune affectation n'est possible.">
-            {(p) => <input {...p} value={f.prestataire_org_id} onChange={(e) => set('prestataire_org_id', e.target.value)} autoComplete="off" spellCheck={false} />}
           </Field>
         </div>
         <Field label="Notes internes">

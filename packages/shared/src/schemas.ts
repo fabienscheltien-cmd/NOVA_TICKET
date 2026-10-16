@@ -20,7 +20,6 @@ export const prestataireInputSchema = z.object({
   zone: optText(120),
   statut: z.enum(['actif', 'suspendu']).default('actif'),
   assurance_expire_le: date.nullish().transform((v) => v ?? null),
-  prestataire_org_id: uuid.nullish().transform((v) => v ?? null),
   notes: optText(1000),
   familles: z.array(referencementSchema).max(50).default([]).refine(
     (l) => new Set(l.map((f) => f.famille_id)).size === l.length, 'une famille ne peut être référencée qu\'une fois'),

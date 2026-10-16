@@ -34,6 +34,9 @@ export interface Prestataire {
   assurance_expire_le: string | null;
   /** Compte prestataire sur la plateforme ; null = pas encore rattaché (aucune affectation possible). */
   prestataire_org_id: string | null;
+  /** Dernière invitation à créer un compte (adresse et date) ; sans effet une fois le compte rattaché. */
+  invitation_email: string | null;
+  invitation_envoyee_le: string | null;
   notes: string | null;
   familles: Referencement[];
   created_at: string;
