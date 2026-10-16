@@ -34,6 +34,7 @@ export const PERMISSIONS: Record<string, Partial<Record<Role, Grant>>> = {
   'contrat.write': { admin_org: A, gestionnaire_fm: A },
   'user.invite': { admin_org: A },
   'user.manage': { admin_org: A },
+  'annuaire.read': { admin_org: A, gestionnaire_fm: A, accueil: A, responsable_site: A, asset_manager: A },
   'config.manage': { admin_org: A, gestionnaire_fm: A },
   'report.read': { admin_org: A, gestionnaire_fm: A, accueil: C, responsable_site: A, asset_manager: A },
   'export.run': { admin_org: A, gestionnaire_fm: A, asset_manager: A },

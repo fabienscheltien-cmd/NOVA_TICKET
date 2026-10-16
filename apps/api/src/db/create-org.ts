@@ -1,5 +1,6 @@
 import type pg from 'pg';
 import { randomToken, sha256Hex } from '../auth/crypto.js';
+import { seedFamillesStandard } from '../dispatch/dispatch.service.js';
 
 /**
  * Création d'une organisation et de l'invitation de son premier administrateur.
@@ -15,6 +16,7 @@ export async function createOrgWithAdminInvitation(
   try {
     const org = await client.query<{ id: string }>('INSERT INTO organisation (type, nom) VALUES ($1, $2) RETURNING id', [input.type, input.nom]);
     const orgId = org.rows[0]!.id;
+    if (input.type !== 'prestataire') await seedFamillesStandard(client, orgId);
     await client.query(
       `INSERT INTO invitation (org_id, email, role, token_hash, expires_at)
        VALUES ($1, lower($2), 'admin_org', $3, now() + make_interval(days => $4))`,
