@@ -35,7 +35,7 @@ export const APP_URL = process.env.DATABASE_URL_APP ?? 'postgres://nova_app:nova
 // Identifiants fixes : DONNÉES DE TEST FACTICES, jamais utilisées hors tests.
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 export const ID = {
-  B1: id(1), B2: id(2), PM1: id(3), PM2: id(4), P1: id(5), P2: id(6), P3: id(7), S1: id(8), ED: id(9),
+  B1: id(1), B2: id(2), PM1: id(3), PM2: id(4), P1: id(5), P2: id(6), P3: id(7), S1: id(8), ED: id(9), PM3: id(10),
   uPM1: id(11), uP1: id(12), uP2: id(13), uMulti: id(14), uB1: id(15), uB2: id(16),
   siteB1a: id(21), siteB1b: id(22), siteB2: id(23),
   t1: id(31), t2: id(32), t3: id(33), t4: id(34),
@@ -52,7 +52,8 @@ export const tenantDb = (pool: pg.Pool) => new TenantDb(pool);
 
 // Tables lisibles par nova_app : sans espace de travail, elles doivent toutes renvoyer 0 ligne.
 export const DATA_TABLES = [
-  'message', 'fil_participant', 'fil', 'acces_objet', 'ticket', 'site', 'appartenance', 'utilisateur', 'organisation', 'invitation',
+  'message', 'fil_participant', 'fil', 'acces_objet', 'ticket', 'occupation', 'contact', 'occupant', 'local', 'niveau', 'batiment',
+  'site', 'mandat_gestion', 'portefeuille', 'appartenance', 'utilisateur', 'organisation', 'invitation',
 ] as const;
 // Tables d'authentification : aucun droit pour nova_app.
 export const AUTH_TABLES = ['credential', 'code_secours', 'session_refresh'] as const;
@@ -65,9 +66,11 @@ export async function seed(admin: pg.Client): Promise<void> {
     [ID.PM1, 'property_manager', 'PM 1 (mandats B1 et B2)'], [ID.PM2, 'property_manager', 'PM 2'],
     [ID.P1, 'prestataire', 'Prestataire 1'], [ID.P2, 'prestataire', 'Prestataire 2 (concurrent de P1)'],
     [ID.P3, 'prestataire', 'Prestataire 3'], [ID.S1, 'prestataire', 'Sous-traitant de P1'],
-    [ID.ED, 'editeur', 'Éditeur'],
+    [ID.ED, 'editeur', 'Éditeur'], [ID.PM3, 'property_manager', 'PM 3'],
   ];
   for (const [i, t, n] of orgs) await admin.query('INSERT INTO organisation (id, type, nom) VALUES ($1,$2,$3)', [i, t, n]);
+  // Mandats : PM1 gère tout le patrimoine de B1, PM2 celui de B2 ; PM3 n'a aucun mandat au départ.
+  await admin.query('INSERT INTO mandat_gestion (bailleur_org_id, pm_org_id) VALUES ($1, $2), ($3, $4)', [ID.B1, ID.PM1, ID.B2, ID.PM2]);
   const users: Array<[string, string]> = [
     [ID.uPM1, 'pm1@test.invalid'], [ID.uP1, 'p1@test.invalid'], [ID.uP2, 'p2@test.invalid'],
     [ID.uMulti, 'multi@test.invalid'], [ID.uB1, 'b1@test.invalid'], [ID.uB2, 'b2@test.invalid'],
