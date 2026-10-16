@@ -1,0 +1,19 @@
+# Gabarit nginx de la console. ${API_ORIGIN} est remplacée au démarrage par l'image (envsubst).
+server {
+  listen 8080;
+  root /usr/share/nginx/html;
+  server_tokens off;
+
+  # En-têtes de sécurité. Le jeton d'accès vit dans le stockage local : une CSP stricte limite l'impact d'un XSS (D43).
+  add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' ${API_ORIGIN}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'" always;
+  add_header X-Content-Type-Options "nosniff" always;
+  add_header Referrer-Policy "no-referrer" always;
+  add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+  add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+  location = /healthz { access_log off; add_header Content-Type text/plain; return 200 "ok\n"; }
+
+  # Fichiers versionnés par Vite : cache long. L'index n'est jamais mis en cache.
+  location /assets/ { add_header Cache-Control "public, max-age=31536000, immutable" always; try_files $uri =404; }
+  location / { add_header Cache-Control "no-cache" always; try_files $uri /index.html; }
+}

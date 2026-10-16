@@ -1,9 +1,20 @@
+import { existsSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import pg from 'pg';
 import { createOrgWithAdminInvitation } from './create-org.js';
 
-const MIGRATIONS_DIR = path.resolve(import.meta.dirname, '../../../../db/migrations');
+/**
+ * Dossier des migrations : MIGRATIONS_DIR si défini ; sinon `db/migrations` à la racine du dépôt, que l'on lance le
+ * TypeScript (src/db) ou le JavaScript compilé (dist/src/db, un niveau plus bas, ex. /app/apps/api/dist/src/db → /app/db).
+ */
+export function resolveMigrationsDir(env: NodeJS.ProcessEnv = process.env, here: string = import.meta.dirname): string {
+  if (env.MIGRATIONS_DIR) return path.resolve(env.MIGRATIONS_DIR);
+  const candidats = ['../../../../db/migrations', '../../../../../db/migrations'].map((r) => path.resolve(here, r));
+  const trouve = candidats.find((c) => existsSync(c));
+  if (!trouve) throw new Error(`dossier des migrations introuvable (cherché : ${candidats.join(', ')}) ; définissez MIGRATIONS_DIR`);
+  return trouve;
+}
 
 function adminUrl(): string {
   const url = process.env.DATABASE_URL_ADMIN;
@@ -38,11 +49,12 @@ export async function migrate(client: pg.Client): Promise<string[]> {
   await client.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
     name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())`);
   const done = new Set((await client.query<{ name: string }>('SELECT name FROM schema_migrations')).rows.map((r) => r.name));
-  const files = (await readdir(MIGRATIONS_DIR)).filter((f) => f.endsWith('.sql')).sort();
+  const dir = resolveMigrationsDir();
+  const files = (await readdir(dir)).filter((f) => f.endsWith('.sql')).sort();
   const applied: string[] = [];
   for (const file of files) {
     if (done.has(file)) continue;
-    const sql = await readFile(path.join(MIGRATIONS_DIR, file), 'utf8');
+    const sql = await readFile(path.join(dir, file), 'utf8');
     await client.query('BEGIN');
     try {
       await client.query('SET LOCAL ROLE nova_owner');
