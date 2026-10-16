@@ -16,6 +16,9 @@ pnpm --filter @nova/api exec tsx src/db/cli.ts create-org bailleur "Nom du baill
 Le jeton d'invitation s'affiche une seule fois (seule son empreinte est stockée). Il s'utilise via `POST /invitations/{jeton}/accept`.
 Désactivations d'administration (réservées à la plateforme, sans droit pour l'API) : `SELECT app.user_deactivate('<uuid>')`, `SELECT app.org_deactivate('<uuid>')`.
 
+## Mettre la démonstration en ligne (Netlify ou Vercel)
+`netlify.toml` et `vercel.json` (racine) déploient la console **en mode démonstration** : données fictives, connexion permissive, aucune API. Importez le dépôt GitHub sur Netlify (« Import an existing project ») ou Vercel (« Add New > Project ») ; la commande de build, le dossier publié (`apps/web/dist`), le repli des routes vers l'index et les en-têtes de sécurité sont lus dans ces fichiers. Vérifié ici : la commande de build depuis un état propre, et le résultat servi avec la même politique de sécurité (connexion, navigation, route profonde, 0 violation) ; **non vérifié : le déploiement chez l'hébergeur lui-même**. Lovable n'est pas adapté à ce dépôt (monorepo pnpm, backend NestJS/PostgreSQL).
+
 ## Console d'administration (web)
 
 **Accès de démonstration (`pnpm web`, sans variable) :** l'écran de connexion accepte n'importe quel e-mail et mot de passe, même vides, et entre en administrateur sur des données fictives non enregistrées. Il n'y a ni API ni donnée réelle derrière : rien n'est protégé ni exposé. Cette connexion permissive n'existe **jamais** en mode API (`VITE_DATA_SOURCE=api`, ce que fixe `Dockerfile.web` en production) : test de garde-fou dans `apps/web/test/connexion.test.tsx` et `config.test.ts`. L'API, elle, n'a pas de mode permissif.

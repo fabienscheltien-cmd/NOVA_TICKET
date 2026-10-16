@@ -1,0 +1,29 @@
+# Déploiement statique de la console en MODE DÉMONSTRATION (données fictives, connexion permissive, aucune API).
+# Netlify : « Add new site » > « Import an existing project » > ce dépôt ; tout est lu dans ce fichier.
+# Pour une console branchée sur une vraie API, définir VITE_DATA_SOURCE=api et VITE_API_URL dans l'environnement du site
+# (et revoir connect-src ci-dessous).
+[build]
+  command = "corepack enable && pnpm install --frozen-lockfile --filter \"@nova/web...\" && pnpm --filter @nova/shared build && pnpm --filter @nova/web build"
+  publish = "apps/web/dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# Application monopage : toute route inconnue renvoie l'index (le routeur de la console prend le relais).
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
