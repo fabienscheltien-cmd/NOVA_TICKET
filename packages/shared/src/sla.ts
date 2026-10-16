@@ -75,43 +75,55 @@ function parcourir(depart: Date, c: CalendrierCalc, visite: (i: Intervalle) => b
   throw new CalendrierInvalide('aucune plage ouvrée dans les trois ans qui suivent : calendrier inutilisable');
 }
 
-/** Échéance = départ + `minutes` minutes ouvrées (départ hors plage : le chrono démarre à la prochaine ouverture). */
-export function echeanceOuvree(depart: Date, minutes: number, c: CalendrierCalc): Date {
-  if (!Number.isInteger(minutes) || minutes <= 0) throw new RangeError('minutes : entier strictement positif');
+/**
+ * Échéance en millisecondes ouvrées. Aucun arrondi à la minute : un départ à 17:05:41 doit donner une échéance exacte à la
+ * seconde, sinon chaque tranche de journée traversée ajoute une erreur de quelques secondes.
+ */
+function echeanceOuvreeMs(depart: Date, ms: number, c: CalendrierCalc): Date {
   validerCalendrier(c);
-  let reste = minutes;
+  let reste = ms;
   let fin = depart.getTime();
   parcourir(depart, c, (i) => {
-    const dispo = Math.round((i.fin - i.debut) / 60000);
-    if (dispo >= reste) { fin = i.debut + reste * 60000; return true; }
+    const dispo = i.fin - i.debut;
+    if (dispo >= reste) { fin = i.debut + reste; return true; }
     reste -= dispo;
     return false;
   });
   return new Date(fin);
 }
 
-/** Minutes ouvrées écoulées entre `a` et `b` (0 si b ≤ a). */
-export function minutesOuvreesEntre(a: Date, b: Date, c: CalendrierCalc): number {
+/** Échéance = départ + `minutes` minutes ouvrées (départ hors plage : le chrono démarre à la prochaine ouverture). */
+export function echeanceOuvree(depart: Date, minutes: number, c: CalendrierCalc): Date {
+  if (!Number.isInteger(minutes) || minutes <= 0) throw new RangeError('minutes : entier strictement positif');
+  return echeanceOuvreeMs(depart, minutes * 60_000, c);
+}
+
+/** Millisecondes ouvrées exactes entre `a` et `b` (0 si b ≤ a). */
+function ouvreesEntreMs(a: Date, b: Date, c: CalendrierCalc): number {
   if (b.getTime() <= a.getTime()) return 0;
   validerCalendrier(c);
   let total = 0;
   parcourir(a, c, (i) => {
     if (i.debut >= b.getTime()) return true;
-    total += (Math.min(i.fin, b.getTime()) - i.debut) / 60000;
+    total += Math.min(i.fin, b.getTime()) - i.debut;
     return i.fin >= b.getTime();
   });
-  return Math.round(total);
+  return total;
+}
+
+/** Minutes ouvrées écoulées entre `a` et `b` (0 si b ≤ a), arrondies à la minute la plus proche. */
+export function minutesOuvreesEntre(a: Date, b: Date, c: CalendrierCalc): number {
+  return Math.round(ouvreesEntreMs(a, b, c) / 60_000);
 }
 
 /**
  * Pause puis reprise : l'échéance est recalculée à partir du temps ouvré RESTANT à la reprise
- * (06-sla, point 3). Le temps ouvré écoulé pendant la pause ne compte pas.
+ * (06-sla, point 3). Le temps ouvré écoulé pendant la pause ne compte pas. Calcul exact, sans arrondi intermédiaire.
  */
 export function echeanceApresPause(depart: Date, delaiMinutes: number, pauseDebut: Date, reprise: Date, c: CalendrierCalc): Date {
-  const ecoule = minutesOuvreesEntre(depart, pauseDebut, c);
-  const reste = delaiMinutes - ecoule;
+  const reste = delaiMinutes * 60_000 - ouvreesEntreMs(depart, pauseDebut, c);
   if (reste <= 0) return pauseDebut;
-  return echeanceOuvree(reprise, reste, c);
+  return echeanceOuvreeMs(reprise, reste, c);
 }
 
 export const CALENDRIER_24_7: CalendrierCalc = { fuseau: 'Europe/Paris', plages: [{ jours: [1, 2, 3, 4, 5, 6, 7], debut: '00:00', fin: '24:00' }], fermetures: [] };
