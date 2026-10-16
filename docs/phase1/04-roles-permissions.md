@@ -46,6 +46,7 @@ Légende : ✔ accordé · ◐ conditionné · — non
 | `contrat.read` | ✔ | ✔ | — | — | ✔ | — | — | — |
 | `contrat.write` / `sla.configure` | ✔ | ✔ | — | — | — | — | — | — |
 | `user.invite` / `manage` | ✔ | — | — | — | — | — | — | — |
+| `annuaire.read` (annuaire des prestataires, familles) | ✔ | ✔ | ✔ | ✔ | ✔ | — | — | — |
 | `config.manage` (catégories, statuts, règles) | ✔ | ✔ | — | — | — | — | — | — |
 | `report.read` | ✔ | ✔ | ◐ | ✔ | ✔ | — | — | — |
 | `export.run` | ✔ | ✔ | — | — | ✔ | — | — | — |

@@ -31,6 +31,6 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm --filter @nova/api db:bootstrap
       - run: pnpm db:migrate
-      - name: Tests d'isolation (niveaux 1 à 3 + contrôle négatif)
+      - name: Tests (isolation et API sur PostgreSQL réel, paquet partagé, console web)
         run: pnpm test
       - run: pnpm build

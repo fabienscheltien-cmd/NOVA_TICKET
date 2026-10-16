@@ -43,6 +43,18 @@
 | POST | `/tickets/bulk` (actions en masse) |
 | GET | `/tickets/{id}/duplicates` · `/tickets/{id}/timeline` |
 
+### Implémenté : familles, annuaire, création de tickets, affectation
+| Méthode | Route | Permission |
+|---|---|---|
+| GET · POST | `/familles` · `/familles/defaults` (familles standard, idempotent) | `annuaire.read` · `config.manage` |
+| PATCH | `/familles/{id}` (`libelle`, `actif`, `ordre`) | `config.manage` |
+| GET · POST | `/annuaire` (filtres `q`, `famille_id`, `statut`) | `annuaire.read` · `config.manage` |
+| GET · PATCH | `/annuaire/{id}` (`familles` remplace les référencements) | `annuaire.read` · `config.manage` |
+| POST | `/annuaire/{id}/statut` (`actif` / `suspendu`) | `config.manage` |
+| POST | `/tickets` (`titre`, `famille_id`, `site_id`, `local_id?`, `priorite?`) : renvoie le détail avec la sélection des éligibles | `ticket.create` |
+| GET | `/tickets` · `/tickets/{id}` (détail : historique des affectations, `selection.eligibles`, `selection.suggere`) | `ticket.read` |
+| POST | `/tickets/{id}/affectation` (`annuaire_id`, `motif?`) : 200, 404, 409 `deja_affecte` / `statut_incompatible`, 422 `non_eligible` + `raison` | `ticket.assign` |
+
 ## Fils, pièces jointes
 `GET/POST /fils/{id}/messages`, `POST /files/upload-url` (URL pré-signée), `POST /files/{id}/confirm`, `GET /files/{id}/download-url` (courte durée, après contrôle d'accès, statut antivirus requis « sain »).
 

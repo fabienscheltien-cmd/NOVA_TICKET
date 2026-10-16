@@ -2,11 +2,14 @@
   "name": "nova-ticket",
   "private": true,
   "packageManager": "pnpm@10.28.0",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm --filter @nova/shared build && pnpm -r typecheck",
     "build": "pnpm -r build",
     "db:migrate": "pnpm --filter @nova/api db:migrate",
-    "test": "pnpm --filter @nova/api test"
+    "test": "pnpm --filter @nova/shared build && pnpm -r test",
+    "web": "pnpm --filter @nova/web dev"
   }
 }
