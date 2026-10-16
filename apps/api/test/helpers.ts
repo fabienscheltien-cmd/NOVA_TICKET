@@ -56,7 +56,7 @@ export const DATA_TABLES = [
   'site', 'mandat_gestion', 'portefeuille', 'appartenance', 'utilisateur', 'organisation', 'invitation',
 ] as const;
 // Tables d'authentification : aucun droit pour nova_app.
-export const AUTH_TABLES = ['credential', 'code_secours', 'session_refresh'] as const;
+export const AUTH_TABLES = ['credential', 'code_secours', 'session_refresh', 'password_reset'] as const;
 
 /** Vide et reconstruit le jeu de données de test (connexion administrateur, hors RLS). */
 export async function seed(admin: pg.Client): Promise<void> {

@@ -5,6 +5,7 @@ import { AuthController, InvitationsController, MeController } from './auth.cont
 import { AuthService } from './auth.service.js';
 import { loadAuthConfig } from './config.js';
 import { OrgGuard, UserGuard } from './guards.js';
+import { RateLimitGuard } from './rate-limit.js';
 import { ConsoleMailer, MAILER, type Mailer } from './mailer.js';
 
 @Module({
@@ -19,6 +20,7 @@ import { ConsoleMailer, MAILER, type Mailer } from './mailer.js';
     },
     UserGuard,
     OrgGuard,
+    RateLimitGuard,
   ],
   exports: [AuthService],
 })
