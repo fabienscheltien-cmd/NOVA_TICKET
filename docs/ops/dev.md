@@ -21,7 +21,9 @@ Désactivations d'administration (réservées à la plateforme, sans droit pour 
 pnpm web                       # http://127.0.0.1:5173, données de démonstration (défaut)
 VITE_DATA_SOURCE=api VITE_API_URL=http://localhost:3000 pnpm web   # contre l'API réelle
 ```
-En mode API, la console demande le jeton d'accès de l'espace de travail (`POST /auth/login`, puis `POST /me/workspace/switch`) et le conserve dans le navigateur. Voir [annuaire et affectation](../phase2/annuaire-et-affectation.md).
+En mode API, la console a son écran de connexion : identifiants, code MFA, activation de la MFA si le rôle l'exige (codes de secours affichés une fois), choix de l'espace de travail, « mot de passe oublié », réinitialisation (`/mot-de-passe/:jeton`) et acceptation d'invitation (`/invitations/:jeton`, les liens des e-mails simulés). Les jetons sont conservés dans le stockage local du navigateur ; le jeton d'accès est rafraîchi automatiquement (une seule rotation à la fois). Voir [annuaire et affectation](../phase2/annuaire-et-affectation.md).
+
+L'API doit autoriser l'origine de la console : `CORS_ORIGINS` (défaut `APP_BASE_URL`). Derrière un répartiteur de charge, régler `TRUST_PROXY` (nombre de proxys de confiance), sinon la limitation de débit par IP voit une seule adresse. `RATE_LIMIT_AUTH_PER_MIN` (défaut 20) règle les tentatives par minute et par IP ; le compteur est en mémoire, propre à chaque instance (Redis le partagera).
 
 Tests : `pnpm test` exécute le paquet partagé (règle d'éligibilité, démonstration), la console (composants, accessibilité) et l'API (base PostgreSQL réelle, variables d'environnement ci-dessus).
 

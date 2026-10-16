@@ -9,7 +9,7 @@ import './styles.css';
 const source = creerSource();
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <AppContext.Provider value={{ repo: source.repo, today: defaultToday }}>
+    <AppContext.Provider value={{ repo: source.repo, today: defaultToday, ...(source.auth ? { auth: source.auth } : {}) }}>
       <BrowserRouter>
         <App />
       </BrowserRouter>

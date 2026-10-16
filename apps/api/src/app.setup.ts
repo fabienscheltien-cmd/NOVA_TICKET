@@ -9,5 +9,15 @@ export function configureApp(app: INestApplication): void {
   if (Number.isInteger(hops) && hops > 0) express.set('trust proxy', hops);
   express.useBodyParser('json', { limit: '1mb' });
   express.useBodyParser('text', { type: ['text/csv', 'text/plain'], limit: '5mb' });
+  // La console web est servie depuis une autre origine : seules les origines listées sont autorisées (jamais « * »).
+  // Les jetons voyagent dans l'en-tête Authorization, pas dans des cookies : pas de credentials.
+  const origines = (process.env.CORS_ORIGINS ?? process.env.APP_BASE_URL ?? 'http://localhost:5173').split(',').map((o) => o.trim().replace(/\/$/, '')).filter(Boolean);
+  app.enableCors({
+    origin: origines,
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
+    allowedHeaders: ['authorization', 'content-type'],
+    exposedHeaders: ['retry-after'],
+    maxAge: 600,
+  });
   app.useGlobalFilters(new PgExceptionFilter());
 }
